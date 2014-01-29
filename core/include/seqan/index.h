@@ -105,6 +105,7 @@
 #include <seqan/index/quicksort.h>
 #include <seqan/index/index_sa_bpr.h>
 
+
 //____________________________________________________________________________
 // enhanced table creators
 
@@ -115,6 +116,7 @@
 #include <seqan/index/index_childtab.h>
 #include <seqan/index/index_bwt.h>
 
+#include <seqan/index/index_bwt_bcr.h>
 
 //////////////////////////////////////////////////////////////////////////////
 // INDEX USAGE
