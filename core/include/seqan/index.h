@@ -102,6 +102,9 @@
 #include <seqan/index/pump_separator7.h>
 #include <seqan/index/index_skew7_multi.h>
 
+#include <seqan/index/quicksort.h>
+#include <seqan/index/index_sa_bpr.h>
+
 //____________________________________________________________________________
 // enhanced table creators
 
