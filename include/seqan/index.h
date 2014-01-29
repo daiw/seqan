@@ -126,9 +126,17 @@
 #include <seqan/index/index_childtab.h>
 #include <seqan/index/index_bwt.h>
 
+<<<<<<< HEAD:include/seqan/index.h
 // ==========================================================================
 // Index usage.
 // ==========================================================================
+=======
+#include <seqan/index/index_bwt_bcr.h>
+
+//////////////////////////////////////////////////////////////////////////////
+// INDEX USAGE
+//////////////////////////////////////////////////////////////////////////////
+>>>>>>> [FEATURE] copied index_bwt_bcr from svn:core/include/seqan/index.h
 
 #include <seqan/index/index_shims.h>
 
