@@ -108,6 +108,11 @@ add_executable (test_index_vstree
                 test_index_helpers.h)
 target_link_libraries (test_index_vstree ${SEQAN_LIBRARIES})
 
+add_executable (test_index_sa_bpr
+                test_index_sa_bpr.cpp
+                test_index_sa_bpr.h)
+target_link_libraries (test_index_sa_bpr ${SEQAN_LIBRARIES})
+
 # GCC < 4.5 segfaults when compiling the test_index_stree_iterators test.
 # Enable if the compiler is not GCC or the version is >= 4.5.
 if (NOT CMAKE_COMPILER_IS_GNUCXX OR (450 LESS _GCC_VERSION))
