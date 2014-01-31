@@ -37,26 +37,50 @@
 
 #include <seqan/basic.h>
 #include <seqan/sequence.h>
+#include <seqan/index.h>
 
-// A test for strings.
-SEQAN_DEFINE_TEST(test_index_sa_bpr_strings_example1)
-{
-    using namespace seqan;
 
-    // Define some constant test data for comparison...
-    CharString const STRING1 = "test 1";
-    CharString const STRING2 = "test 2";
+using namespace seqan;
 
-    // Append to a string and make equality assertion on the result.
-    CharString myStr = "test ";
-    append(myStr, "1");
-    SEQAN_ASSERT_EQ(STRING1, myStr);
+template<typename TText>
+void testCodeD(TText text){
 
-    // Demonstration of other assertions.
-    SEQAN_ASSERT_GT(STRING2, myStr);
-    SEQAN_ASSERT_GEQ(STRING2, myStr);
-    SEQAN_ASSERT_LT(myStr, STRING2);
-    SEQAN_ASSERT_LEQ(STRING2, STRING2);
+    typedef typename Value<TText>::Type TValue;
+    typedef typename ValueSize<TValue>::Type TAlphabetSize;
+
+    const TAlphabetSize ALPHABETSIZE = ValueSize<TValue>::VALUE + 1;
+
+	for (short d = 1; d < 4; ++d) {
+		long tmpModulo = pow(ALPHABETSIZE, (d - 1));
+		int last = code_d(text, d, 0, ALPHABETSIZE);
+		for (unsigned i = 1; i < length(text); ++i) {
+			int current_rek = code_d(text, d, i, ALPHABETSIZE, tmpModulo, last);
+			int current_it = code_d(text, d, i, ALPHABETSIZE);
+			SEQAN_ASSERT_EQ(current_it, current_rek);
+			last = current_it;
+		}
+	}
 }
+
+
+// A test for code_D.
+SEQAN_DEFINE_TEST(test_index_sa_bpr_codeD)
+{
+
+	using namespace seqan;
+
+    String<Dna> text = "ACGTGCTG";
+    testCodeD(text);
+
+    String<char> text2 = "halloWelt!";
+    testCodeD(text2);
+
+    text = "AC";
+    testCodeD(text);
+
+    text = "";
+    testCodeD(text);
+}
+
 
 #endif  // CORE_TESTS_INDEX_SA_BPR_TEST_INDEX_SA_BPR_H_
