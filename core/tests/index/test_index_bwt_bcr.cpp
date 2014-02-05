@@ -42,5 +42,6 @@ SEQAN_BEGIN_TESTSUITE(test_index_bwt_bcr)
 {
     // Call tests.
 	SEQAN_CALL_TEST(test_index_bwt_bcr_sortBwtBucket);
+	SEQAN_CALL_TEST(test_index_bwt_bcr_compareBwt);
 }
 SEQAN_END_TESTSUITE
