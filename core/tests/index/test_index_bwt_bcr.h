@@ -39,7 +39,275 @@
 #include <seqan/sequence.h>
 #include <seqan/index.h>
 
-// A test for strings.
+using namespace seqan;
+
+template<typename TText, typename TBWT, typename TSENT>
+void computeBwt(TText &texts, TBWT &bwt, TSENT &sentinelPos) {
+
+	typedef typename Value<TText>::Type TA;
+	typedef typename Value<TA>::Type TAlphabet;
+
+	resize(bwt, lengthSum(texts) + countSequences(texts));
+	resize(sentinelPos, countSequences(texts), Exact());
+	TAlphabet sentinelChar = (TAlphabet) 0;
+
+#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
+	std::cout << "Computing BWT...   ";
+	std::cout.flush();
+	const clock_t begin_time = omp_get_wtime();
+#endif
+
+	createBwt(bwt, texts, sentinelPos, sentinelChar);
+
+#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
+	std::cout << " done. " << float(omp_get_wtime() - begin_time) << std::endl;
+	std::cout.flush();
+#endif
+}
+
+template<typename TText, typename TBWT, typename TSENT>
+void computeBwtViaSA(StringSet<TText> &texts, TBWT &bwt, TSENT &sentinelPos) {
+
+	typedef typename Value<TText>::Type TAlphabet;
+	typedef typename SAValue<StringSet<TText> >::Type TSAValue;
+	String<TSAValue> sa;
+	resize(sa, lengthSum(texts), Exact());
+	TAlphabet sentinelChar = (TAlphabet) 0;
+	RankSupportBitString<void> dollarPos = _setDefaultSentinelPosition(
+		length(bwt), RankSupportBitString<void>());
+	resize(bwt, _computeBwtLength(texts), Exact());
+
+#ifdef _OPENMP
+	std::cout << "Computing BWT via SA...   ";
+	std::cout.flush();
+	const clock_t begin_time = omp_get_wtime();
+#endif
+
+	createSuffixArray(sa, texts, Bpr(), 3);
+	_createBwTable(bwt, dollarPos, texts, sa, sentinelChar);
+
+#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
+	std::cout << " done. " << float(omp_get_wtime() - begin_time) << std::endl;
+	std::cout.flush();
+#endif
+
+	resize(sentinelPos, countSequences(texts));
+
+	int sentinelIndex = 0;
+	for (unsigned i = 0; i < length(bwt); ++i) {
+		if (bwt[i] == sentinelChar && isBitSet(dollarPos, i)) {
+			sentinelPos[sentinelIndex++] = i;
+		}
+	}
+}
+
+template<typename TText, typename TBWT, typename TSENT>
+void computeBwtViaSA(TText texts, TBWT &bwt, TSENT &sentinelPos) {
+
+	typedef typename Value<TText>::Type TA;
+	typedef typename Value<TA>::Type TAlphabet;
+	typedef typename SAValue<TText>::Type TSAValue;
+	String<TSAValue> sa;
+	resize(sa, lengthSum(texts), Exact());
+
+	TAlphabet sentinelChar = (TAlphabet) 0;
+	unsigned dollarPos = 0;
+	resize(bwt, _computeBwtLength(texts), Exact());
+
+#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
+	std::cout << "Computing BWT via SA...  ";
+	std::cout.flush();
+	const clock_t begin_time = omp_get_wtime();
+#endif
+
+	createSuffixArray(sa, texts, Bpr(), 3);
+	_createBwTable(bwt, dollarPos, texts, sa, sentinelChar);
+
+#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
+	std::cout << " done. " << float(omp_get_wtime() - begin_time) << std::endl;
+#endif
+
+	resize(sentinelPos, countSequences(texts));
+	for (unsigned i = 0; i < length(bwt); ++i) {
+		if (bwt[i] == sentinelChar && dollarPos == i) {
+			sentinelPos[0] = i;
+			break;
+		}
+	}
+}
+
+template<typename TBWT, typename TSENT>
+void compareBwt(TBWT &bwt, TSENT &sentinelPos, TBWT &bwt2,
+		TSENT &sentinelPos2) {
+
+	SEQAN_ASSERT_EQ_MSG(length(bwt), length(bwt2), "The bwts have a different length.");
+
+	SEQAN_ASSERT_EQ_MSG(length(sentinelPos), length(sentinelPos2), "The sentinel lists have a different length.");
+
+	unsigned sentinelIndex = 0;
+	for (unsigned i = 0; i < length(bwt); ++i) {
+		if (sentinelIndex < length(sentinelPos)
+				&& sentinelPos[sentinelIndex] == i) {
+
+			SEQAN_ASSERT_EQ_MSG(sentinelPos[sentinelIndex], sentinelPos2[sentinelIndex], "The bwts have different sentinel positions.");
+			++sentinelIndex;
+		} else {
+			SEQAN_ASSERT_EQ(bwt[i], bwt2[i]);//, "The bwts are different at position %d.", i);
+		}
+	}
+}
+
+// A test for comprating bwt_bcr with a bwt computed via SuffixArray.
+SEQAN_DEFINE_TEST(test_index_bwt_bcr_compareBwt)
+{
+    using namespace seqan;
+
+	{
+		String<Dna> text1 = "TGCCAAC";
+		String<Dna> text2 = "AGAGCTC";
+		String<Dna> text3 = "GTCGCTT";
+
+		StringSet<String<Dna> > texts;
+		appendValue(texts, text1); appendValue(texts, text2); appendValue(texts, text3);
+
+		String<Dna> bwt;
+		String<unsigned> sentinelPos;
+		String<Dna> bwt2;
+		String<unsigned> sentinelPos2;
+		computeBwt(texts, bwt, sentinelPos);
+		computeBwtViaSA(texts, bwt2, sentinelPos2);
+		compareBwt(bwt, sentinelPos, bwt2, sentinelPos2);
+	}
+
+	{
+		String<char> bwtChar;
+		String<unsigned> sentinelPosChar;
+		String<char> bwtChar2;
+		String<unsigned> sentinelPosChar2;
+		String<char> text = "apple";
+
+		computeBwt(text, bwtChar, sentinelPosChar);
+		computeBwtViaSA(text, bwtChar2, sentinelPosChar2);
+		compareBwt(bwtChar, sentinelPosChar, bwtChar2, sentinelPosChar2);
+	}
+
+	{
+		String<char> bwtCharX;
+		String<unsigned> sentinelPosCharX;
+		String<char> bwtCharX2;
+		String<unsigned> sentinelPosCharX2;
+		String<char> textX2 = "BANANA";
+		String<char> textX3 = "BANANAAsakjdgbasfislufkjds";
+		String<char> textX4 = "BANANAfalsukdjfbdsavdxv";
+		String<char> textX5 = "falsukjdgbfdasBANANA";
+		String<char> textX6 = "asdfBANafsdlfkhjsfasANA";
+		String<char> textX7 = "qa,jshfgs";//
+		StringSet<String<char> > textsX;
+		appendValue(textsX, textX2);
+		appendValue(textsX, textX3);
+		appendValue(textsX, textX4);
+		appendValue(textsX, textX5);
+		appendValue(textsX, textX6);
+		appendValue(textsX, textX7);
+		computeBwt(textsX, bwtCharX, sentinelPosCharX);
+		computeBwtViaSA(textsX, bwtCharX2, sentinelPosCharX2);
+		compareBwt(bwtCharX, sentinelPosCharX, bwtCharX2, sentinelPosCharX2);
+	}
+
+	{
+		String<Dna> text1 = "";
+		String<Dna> text2 = "";
+		String<Dna> text3 = "";
+
+		StringSet<String<Dna> > texts;
+		appendValue(texts, text1); appendValue(texts, text2); appendValue(texts, text3);
+
+		String<Dna> bwt;
+		String<unsigned> sentinelPos;
+		String<Dna> bwt2;
+		String<unsigned> sentinelPos2;
+		computeBwt(texts, bwt, sentinelPos);
+		//bwt via SA crashes with empty strings
+//		computeBwtViaSA(texts, bwt2, sentinelPos2);
+//		compareBwt(bwt, sentinelPos, bwt2, sentinelPos2);
+	}
+
+	{
+		String<Dna> text1 = "";
+		String<Dna> text2 = "AGAGCTC";
+		String<Dna> text3 = "";
+
+		StringSet<String<Dna> > texts;
+		appendValue(texts, text1); appendValue(texts, text2); appendValue(texts, text3);
+
+		String<Dna> bwt;
+		String<unsigned> sentinelPos;
+		String<Dna> bwt2;
+		String<unsigned> sentinelPos2;
+		computeBwt(texts, bwt, sentinelPos);
+		//bwt via SA crashes with empty strings
+		//computeBwtViaSA(texts, bwt2, sentinelPos2);
+		//compareBwt(bwt, sentinelPos, bwt2, sentinelPos2);
+	}
+
+	{
+		String<Dna> text1 = "";
+		String<Dna> text2 = "";
+		String<Dna> text3 = "GTCGCTT";
+
+		StringSet<String<Dna> > texts;
+		appendValue(texts, text1); appendValue(texts, text2); appendValue(texts, text3);
+
+		String<Dna> bwt;
+		String<unsigned> sentinelPos;
+		String<Dna> bwt2;
+		String<unsigned> sentinelPos2;
+		computeBwt(texts, bwt, sentinelPos);
+		//bwt via SA crashes with empty strings
+//		computeBwtViaSA(texts, bwt2, sentinelPos2);
+//		compareBwt(bwt, sentinelPos, bwt2, sentinelPos2);
+	}
+
+	{
+		String<Dna> text1 = "TGCCAAC";
+		String<Dna> text2 = "";
+		String<Dna> text3 = "";
+
+		StringSet<String<Dna> > texts;
+		appendValue(texts, text1); appendValue(texts, text2); appendValue(texts, text3);
+
+		String<Dna> bwt;
+		String<unsigned> sentinelPos;
+		String<Dna> bwt2;
+		String<unsigned> sentinelPos2;
+		computeBwt(texts, bwt, sentinelPos);
+		//bwt via SA crashes with empty strings
+//		computeBwtViaSA(texts, bwt2, sentinelPos2);
+//		compareBwt(bwt, sentinelPos, bwt2, sentinelPos2);
+	}
+
+	{
+		String<Dna> text1 = "T";
+		String<Dna> text2 = "AGAGCTC";
+		String<Dna> text3 = "";
+
+		StringSet<String<Dna> > texts;
+		appendValue(texts, text1); appendValue(texts, text2); appendValue(texts, text3);
+
+		String<Dna> bwt;
+		String<unsigned> sentinelPos;
+		String<Dna> bwt2;
+		String<unsigned> sentinelPos2;
+		computeBwt(texts, bwt, sentinelPos);
+		//bwt via SA crashes with empty strings
+//		computeBwtViaSA(texts, bwt2, sentinelPos2);
+//		compareBwt(bwt, sentinelPos, bwt2, sentinelPos2);
+	}
+
+}
+
+
+// A test for sortBwtBucket.
 SEQAN_DEFINE_TEST(test_index_bwt_bcr_sortBwtBucket)
 {
     using namespace seqan;
