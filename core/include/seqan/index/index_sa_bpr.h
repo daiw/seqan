@@ -187,6 +187,8 @@ inline void fillBucketsPhase1(TSA &SA, const TText &s, TBptr &bptr, TBkt &bkt,
 	resize(bkt, bucketCount + 1, Exact());
 
 	Splitter<TTextSize> splitter(0, n);
+	typedef typename Size<Splitter<TTextSize> >::Type TSplitterSize;
+
 	String<TBkt> bktPerThread;
 	resize(bktPerThread, length(splitter), Exact());
 
@@ -244,7 +246,7 @@ inline void fillBucketsPhase1(TSA &SA, const TText &s, TBptr &bptr, TBkt &bkt,
 				//TODO: wofür brauche ich den bktOffset?
 
 				bkt[i + bktOffset] = last;
-				for (int j = 0; j < length(splitter); ++j) {
+				for (TSplitterSize j = 0; j < length(splitter); ++j) {
 					bkt[i + bktOffset] += bktPerThread[j][i];
 					tmp = bktPerThread[j][i];
 					bktPerThread[j][i] = perThreadLast;
@@ -638,7 +640,7 @@ TText getOrdererdAlphabet(const String<long> &bkt, const StringSet<TText> &s,
 // Theirfore it uses the sizes of the different Buckets
 //
 template<typename TText>
-TText getOrdererdAlphabet(const String<long> &bkt, const TText &s,
+TText getOrdererdAlphabet(const String<long> &bkt, const TText,
 		const unsigned short &d) {
 	typedef typename AlphabetType<TText>::Type TAlphabet;
 	typedef typename ValueSize<TAlphabet>::Type TAlphabetSize;
