@@ -161,6 +161,9 @@ SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSAStringSets)
 
     StringSet<String<Dna> > text;
 
+//    resize(text, 0);
+//	compareSuffixArrays(text, 5);
+
     resize(text, 1);
     text[0] = "";
     compareSuffixArrays(text, 5);
