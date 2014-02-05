@@ -151,6 +151,9 @@ void createBwt(TBWT &BWT, StringSet<TText> &text,
 	String<TValueSize> qIndex;
 	resize(qIndex, count, Exact()); //Q
 
+	String<TValueSize> tempQIndex; //q+1
+	resize(tempQIndex, count, Exact()); //Q+1
+
 	//number of inserts in last iteration for each Bucket
 	String<unsigned> bucketInsertCount;
 	resize(bucketInsertCount, bucketCount, 0, Exact());
@@ -173,21 +176,31 @@ void createBwt(TBWT &BWT, StringSet<TText> &text,
 		 * tIndex = count - 1 - i: Sort $_1 > $_2 > ... > $_n
 		 */
 		const TValueSize tIndex = count - 1 - i;
-		const TAlphabet newChar = text[tIndex][length(text[tIndex]) - iteration - 1];
+
+		const TText& currentText = text[tIndex];
+		const bool isLastCharOfText = iteration	== length(currentText);
+		const TAlphabet newChar = (isLastCharOfText) ?
+								sentinelSub :
+								currentText[length(currentText)	- iteration - 1];
+
 		const TAlphabetSize b = 0;
 
 		//insert last char of text
-		bucket[b][i] = BucketValueType(i, newChar, false);
+		bucket[b][i] = BucketValueType(i, newChar, isLastCharOfText);
 
 		pos[i].i1 = tIndex;
 		pos[i].i2 = i;
 		qIndex[i] = b;
+		if (isLastCharOfText) {
+			//set invalid bucketnummer to ignore in further iterations
+			qIndex[i] = bucketCount;
+			tempQIndex[i] = bucketCount;
+		}else{
+			qIndex[i] = b;
+		}
 	}
 	bucketVolume[0] = count;
 	bucketInsertCount[0] = count;
-
-	String<TValueSize> tempQIndex; //q+1
-	resize(tempQIndex, count, Exact()); //Q+1
 
 	double countTime = 0;
 	double insertTime = 0;
