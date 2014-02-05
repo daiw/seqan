@@ -154,5 +154,61 @@ SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSA)
     compareSuffixArrays(text, 5);
 }
 
+// This test compares SuffixArrays Computed via Bpr with SuffixArrays computed via Skew
+SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSAStringSets)
+{
+	using namespace seqan;
+
+    StringSet<String<Dna> > text;
+
+    resize(text, 1);
+    text[0] = "";
+    compareSuffixArrays(text, 5);
+
+    text[0] = "A";
+    compareSuffixArrays(text, 5);
+
+    text[0] = "ATGCAACGTVA";
+    compareSuffixArrays(text, 5);
+
+    resize(text, 2);
+    text[1] = "";
+    compareSuffixArrays(text, 5);
+
+    text[1] = "A";
+    compareSuffixArrays(text, 5);
+
+    text[1] = "ATGCAACGTVA";
+	compareSuffixArrays(text, 5);
+
+	text[1] = "ACTAGCAGACGATAC";
+	compareSuffixArrays(text, 5);
+
+	StringSet<String<char> > text2;
+
+	resize(text2, 1);
+	text2[0] = "";
+	compareSuffixArrays(text2, 3);
+
+	text2[0] = "b";
+	compareSuffixArrays(text2, 3);
+
+	text2[0] = "halloWelt!";
+	compareSuffixArrays(text2, 3);
+
+	resize(text2, 2);
+	text2[1] = "";
+	compareSuffixArrays(text2, 3);
+
+	text2[1] = "x";
+	compareSuffixArrays(text2, 3);
+
+	text2[1] = "halloWelt!";
+	compareSuffixArrays(text2, 3);
+
+	text2[1] = "halloWelt!12345";
+	compareSuffixArrays(text2, 3);
+}
+
 
 #endif  // CORE_TESTS_INDEX_SA_BPR_TEST_INDEX_SA_BPR_H_
