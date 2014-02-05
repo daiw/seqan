@@ -37,26 +37,102 @@
 
 #include <seqan/basic.h>
 #include <seqan/sequence.h>
+#include <seqan/index.h>
 
 // A test for strings.
-SEQAN_DEFINE_TEST(test_index_bwt_bcr_strings_example1)
+SEQAN_DEFINE_TEST(test_index_bwt_bcr_sortBwtBucket)
 {
     using namespace seqan;
 
-    // Define some constant test data for comparison...
-    CharString const STRING1 = "test 1";
-    CharString const STRING2 = "test 2";
+	String<Triple<unsigned, char, bool> > bb;
+	resize(bb, 8);
+	String<Triple<unsigned, char, bool> > buffer;
+	resize(buffer, 8);
+	bb[0] = Triple<unsigned, char, bool>(0, 'a', false);
+	bb[1] = Triple<unsigned, char, bool>(1, 'b', false);
+	bb[2] = Triple<unsigned, char, bool>(2, 'f', false);
+	bb[3] = Triple<unsigned, char, bool>(3, 'g', false);
 
-    // Append to a string and make equality assertion on the result.
-    CharString myStr = "test ";
-    append(myStr, "1");
-    SEQAN_ASSERT_EQ(STRING1, myStr);
+	buffer[0] = Triple<unsigned, char, bool>(2, 'c', false);
+	buffer[1] = Triple<unsigned, char, bool>(3, 'd', false);
+	buffer[2] = Triple<unsigned, char, bool>(4, 'e', false);
 
-    // Demonstration of other assertions.
-    SEQAN_ASSERT_GT(STRING2, myStr);
-    SEQAN_ASSERT_GEQ(STRING2, myStr);
-    SEQAN_ASSERT_LT(myStr, STRING2);
-    SEQAN_ASSERT_LEQ(STRING2, STRING2);
+	sortBwtBucket(bb, 4,  buffer, 3);
+
+	for (unsigned i = 0; i < 7; ++i) {
+		SEQAN_ASSERT_EQ(i, bb[i].i1);
+		if(i>0){
+			SEQAN_ASSERT_LT(bb[i - 1].i2, bb[i].i2);
+		}
+	}
+
+	bb[0] =  Triple<unsigned, char, bool>(0, 'c', false);
+	bb[1] =  Triple<unsigned, char, bool>(1, 'd', false);
+
+	buffer[0] =  Triple<unsigned, char, bool>(0, 'a', false);
+	buffer[1] =  Triple<unsigned, char, bool>(1, 'b', false);
+	sortBwtBucket(bb, 2, buffer, 2);
+	for (unsigned i = 0; i < 4; ++i) {
+		SEQAN_ASSERT_EQ(i, bb[i].i1);
+		if(i>0){
+			SEQAN_ASSERT_LT(bb[i - 1].i2, bb[i].i2);
+		}
+	}
+
+	bb[0] =  Triple<unsigned, char, bool>(0, 'a', false);
+	bb[1] =  Triple<unsigned, char, bool>(1, 'b', false);
+
+	buffer[0] =  Triple<unsigned, char, bool>(2, 'c', false);
+	buffer[1] =  Triple<unsigned, char, bool>(3, 'd', false);
+	sortBwtBucket(bb, 2, buffer, 2);
+	for (unsigned i = 0; i < 4; ++i) {
+		SEQAN_ASSERT_EQ(i, bb[i].i1);
+		if(i>0){
+			SEQAN_ASSERT_LT(bb[i - 1].i2, bb[i].i2);
+		}
+	}
+
+	bb[0] =   Triple<unsigned, char, bool>(0, 'b', false);
+	bb[1] =   Triple<unsigned, char, bool>(1, 'c', false);
+
+	buffer[0] = Triple<unsigned, char, bool>(0, 'a', false);
+	buffer[1] = Triple<unsigned, char, bool>(3, 'd', false);
+
+	sortBwtBucket(bb, 2, buffer, 2);
+	for (unsigned i = 0; i < 4; ++i) {
+		SEQAN_ASSERT_EQ(i, bb[i].i1);
+		if(i>0){
+			SEQAN_ASSERT_LT(bb[i - 1].i2, bb[i].i2);
+		}
+	}
+
+	bb[0] = Triple<unsigned, char, bool>(0, 'b', false);
+	bb[1] = Triple<unsigned, char, bool>(1, 'c', false);
+	bb[2] = Triple<unsigned, char, bool>(2, 'e', false);
+	bb[3] = Triple<unsigned, char, bool>(3, 'f', false);
+
+	buffer[0] = Triple<unsigned, char, bool>(0, 'a', false);
+	buffer[1] = Triple<unsigned, char, bool>(3, 'd', false);
+
+	sortBwtBucket(bb, 4, buffer, 2);
+	for (unsigned i = 0; i < 6; ++i) {
+		SEQAN_ASSERT_EQ(i, bb[i].i1);
+		if(i>0){
+			SEQAN_ASSERT_LT(bb[i - 1].i2, bb[i].i2);
+		}
+	}
+
+	bb[0] = Triple<unsigned, char, bool>(0, 'b', false);
+	bb[1] = Triple<unsigned, char, bool>(1, 'c', false);
+
+	buffer[0] = Triple<unsigned, char, bool>(0, 'a', false);
+	sortBwtBucket(bb, 2, buffer, 1);
+	for (unsigned i = 0; i < 3; ++i) {
+		SEQAN_ASSERT_EQ(i, bb[i].i1);
+		if(i>0){
+			SEQAN_ASSERT_LT(bb[i - 1].i2, bb[i].i2);
+		}
+	}
 }
 
 #endif  // CORE_TESTS_INDEX_BWT_BCR_TEST_INDEX_BWT_BCR_H_
