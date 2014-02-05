@@ -42,5 +42,6 @@ SEQAN_BEGIN_TESTSUITE(test_index_sa_bpr)
 {
     // Call tests.
 	SEQAN_CALL_TEST(test_index_sa_bpr_codeD);
+	SEQAN_CALL_TEST(test_index_sa_bpr_compareSA);
 }
 SEQAN_END_TESTSUITE

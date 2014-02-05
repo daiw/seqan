@@ -62,6 +62,59 @@ void testCodeD(TText text){
 	}
 }
 
+template<typename TText>
+void compareSuffixArrays(TText text, unsigned short d) {
+
+	typedef typename SAValue<TText>::Type TSA;
+	String<TSA> sa;
+	String<TSA> sa2;
+
+	resize(sa, lengthSum(text));
+
+#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
+	const clock_t begin_time = omp_get_wtime();
+	std::cout << "Computing BPR... ";
+	std::cout.flush();
+#endif
+
+	createSuffixArray(sa, text, Bpr(), d);
+
+#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
+	std::cout << " done. " << float(omp_get_wtime() - begin_time);
+	std::cout << std::endl;
+	std::cout.flush();
+#endif
+
+	resize(sa2, lengthSum(text));
+
+#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
+	const clock_t begin_time2 = omp_get_wtime();
+	std::cout << "Computing Skew3...   ";
+	std::cout.flush();
+#endif
+
+	createSuffixArray(sa2, text, Skew3());
+
+#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
+	std::cout << " done. " << float(omp_get_wtime() - begin_time2);
+	std::cout << std::endl;
+	std::cout.flush();
+#endif
+
+	//Check for differences:
+	unsigned errors = 0;
+	for (unsigned i = 0; i < length(sa) && errors < 100; ++i) {
+		SEQAN_ASSERT_EQ(sa[i], sa2[i]);
+//		if (sa[i] != sa2[i]) {
+//			std::cerr << "SuffixArray error at index " << i << std::endl;
+//			++errors;
+//		}
+//		std::cerr.flush();
+	}
+//	if (errors == 0)
+//		std::cout << "FEHLERFREI!" << std::endl;
+}
+
 
 // A test for code_D.
 SEQAN_DEFINE_TEST(test_index_sa_bpr_codeD)
@@ -80,6 +133,25 @@ SEQAN_DEFINE_TEST(test_index_sa_bpr_codeD)
 
     text = "";
     testCodeD(text);
+}
+
+// This test compares SuffixArrays Computed via Bpr with SuffixArrays computed via Skew
+SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSA)
+{
+
+	using namespace seqan;
+
+    String<Dna> text = "ACGTGCTG";
+    compareSuffixArrays(text, 5);
+
+    String<char> text2 = "halloWelt!";
+    compareSuffixArrays(text2, 3);
+
+    text = "AC";
+    compareSuffixArrays(text, 5);
+
+    text = "";
+    compareSuffixArrays(text, 5);
 }
 
 
