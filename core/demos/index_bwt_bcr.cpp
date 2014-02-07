@@ -59,7 +59,7 @@ int main(int argc, char const ** argv)
 
     Dna sentinelChar = (Dna) 0;
 
-    createBwt(bwt, texts, sentinelPos, sentinelChar);
+    createBwt(bwt, sentinelPos, texts, sentinelChar);
 
     int sentinelIndex = 0;
     for (int i = 0; i < length(bwt); ++i)
