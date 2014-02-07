@@ -50,9 +50,9 @@ template<typename TPos, typename InType, typename OutType>
 struct _posComparator : public std::unary_function<InType, OutType>
 {
 
-    TPos &s;
+    TPos const &s;
 
-    _posComparator(TPos &_s) :
+    _posComparator(TPos const &_s) :
             s(_s)
     {
     }
@@ -72,27 +72,25 @@ struct _posComparator : public std::unary_function<InType, OutType>
 // ============================================================================
 
 template<typename TBWT, typename TText, typename TSentinelPosition, typename TSentinelSub>
-void createBwt(TBWT &BWT, TText &text, TSentinelPosition &sentinelPos, TSentinelSub const sentinelSub)
+void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, TText & text, TSentinelSub const sentinelSub)
 {
-
     ModifiedString<TText> shallowCopy(text);
     StringSet<ModifiedString<TText> > set;
     appendValue(set, shallowCopy);
 
-    createBwt(BWT, set, sentinelPos, sentinelSub);
+    createBwt(BWT, sentinelPos, set, sentinelSub);
 }
 
 template<typename TBWT, typename TText, typename TSentinelPosition, typename TSentinelSub>
-void createBwt(TBWT &BWT, StringSet<TText> &text, TSentinelPosition &sentinelPos, TSentinelSub const sentinelSub)
+void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & text, TSentinelSub const sentinelSub)
 {
-
     typedef typename Value<TBWT>::Type TAlphabet;
     typedef typename ValueSize<TAlphabet>::Type TAlphabetSize;
     typedef typename Size<TText>::Type TValueSize;
 
-    const TAlphabetSize ALPHABETSIZE = ValueSize<TAlphabet>::VALUE;
-    const TAlphabetSize ALPHABETSIZEWITHDOLLAR = ALPHABETSIZE + 1;
-    const TValueSize count = countSequences(text);
+    TAlphabetSize const ALPHABETSIZE = ValueSize<TAlphabet>::VALUE;
+    TAlphabetSize const ALPHABETSIZEWITHDOLLAR = ALPHABETSIZE + 1;
+    TValueSize const count = countSequences(text);
 
     resize(sentinelPos, count, Exact());
 
@@ -103,14 +101,14 @@ void createBwt(TBWT &BWT, StringSet<TText> &text, TSentinelPosition &sentinelPos
         maxLength = _max(maxLength, length(text[i]));
     }
 
-    short bs = 1;
-    long bc = ALPHABETSIZEWITHDOLLAR;
+    unsigned bs = 1;
+    unsigned bc = ALPHABETSIZEWITHDOLLAR;
 
 #if SEQAN_ENABLE_PARALLELISM
     //Default: 1 bucket per character
     //With more Threads: create buckets for pairs, triples or more
-    int threadCount = omp_get_max_threads();
-    int minBuckets = 200 * threadCount;
+    unsigned threadCount = omp_get_max_threads();
+    unsigned minBuckets = 200 * threadCount;
     while (bc < minBuckets)
     {
         bs += 1;
@@ -118,8 +116,8 @@ void createBwt(TBWT &BWT, StringSet<TText> &text, TSentinelPosition &sentinelPos
     }
 #endif
 
-    const short bucketSize = bs;
-    const long bucketCount = bc;
+    unsigned const bucketSize = bs;
+    unsigned const bucketCount = bc;
 
 //	std::cout<<"BucketSize: "<<bs<<", Number of Buckets: "<<bc<<std::endl;
 
@@ -545,12 +543,11 @@ void createBwt(TBWT &BWT, StringSet<TText> &text, TSentinelPosition &sentinelPos
 
 template<typename TText, typename TBucketCount, typename TBucketSize, typename TAlphabetSize, typename TBucket,
     typename TCharCountBuffer>
-void preallocateMemory(const TText &text, const TBucketCount bucketCount, const TBucketSize bucketSize,
-const TAlphabetSize alphabetSize, TBucket &bucket, TCharCountBuffer &charCountBuffer)
+void preallocateMemory(TText const & text, TBucketCount const & bucketCount, TBucketSize const & bucketSize,
+        TAlphabetSize const & alphabetSize, TBucket & bucket, TCharCountBuffer & charCountBuffer)
 {
-
     typedef typename Size<TText>::Type TValueSize;
-    const TAlphabetSize alphabetSizeWithDollar = alphabetSize + 1;
+    TAlphabetSize const alphabetSizeWithDollar = alphabetSize + 1;
 
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
     double beginAllocTime = omp_get_wtime();
@@ -566,7 +563,7 @@ const TAlphabetSize alphabetSize, TBucket &bucket, TCharCountBuffer &charCountBu
         for(unsigned t = 0; t < length(text[sequence]); ++t)
         {
             unsigned charValue = 0;
-            for(int b = 0; b < bucketSize; ++b)
+            for(TBucketSize b = 0; b < bucketSize; ++b)
             {
                 if(length(text[sequence]) > t + b)
                 charValue += (1 + ordValue(text[sequence][t + b])) * pow(alphabetSizeWithDollar, bucketSize - b - 1);
@@ -596,10 +593,9 @@ const TAlphabetSize alphabetSize, TBucket &bucket, TCharCountBuffer &charCountBu
  * We have 'insertCount' new entrys in bucket. Sort them after with their position in .i1
  */
 template<typename BucketValueType>
-void sortBwtBucket(String<BucketValueType> &bucket, const unsigned bucketVolume,
-        String<BucketValueType> &buffer, const unsigned bufferVolume)
+void sortBwtBucket(String<BucketValueType> & bucket, unsigned const & bucketVolume,
+        String<BucketValueType> const & buffer, unsigned const & bufferVolume)
 {
-
     if (bufferVolume == 0)
         return;
 
@@ -612,7 +608,7 @@ void sortBwtBucket(String<BucketValueType> &bucket, const unsigned bucketVolume,
     while (bufferVolume > insertCount)
     {
 
-        BucketValueType &curBuf = buffer[curBufferIndex];
+        BucketValueType const & curBuf = buffer[curBufferIndex];
 
         if (curBucketIndex >= 0)
         {
@@ -645,10 +641,9 @@ void sortBwtBucket(String<BucketValueType> &bucket, const unsigned bucketVolume,
 }
 
 template<typename TAlphabet, typename TFoo1, typename TFoo2, typename TIndex>
-inline void insertionSort(String<TAlphabet> &qIndex, String<TFoo1> &qIndexTemp, String<TFoo2> &pos,
-        const TIndex left, const TIndex right)
+inline void insertionSort(String<TAlphabet> & qIndex, String<TFoo1> & qIndexTemp, String<TFoo2> & pos,
+        TIndex const & left, TIndex const & right)
 {
-
     TAlphabet keyQ;
     TFoo1 keyQTemp;
     TFoo2 keyPos;
@@ -684,8 +679,8 @@ inline void insertionSort(String<TAlphabet> &qIndex, String<TFoo1> &qIndexTemp, 
 }
 
 template<typename TAlphabet, typename TFoo1, typename TFoo2, typename TIndex>
-void quickSort(String<TAlphabet> &qIndex, String<TFoo1> &qIndexTemp, String<TFoo2> &pos, const TIndex left,
-        const TIndex right, const long depth)
+void quickSort(String<TAlphabet> & qIndex, String<TFoo1> & qIndexTemp, String<TFoo2> & pos, TIndex const left,
+        TIndex const right, long const depth)
 {
     if (right - left < 15)
     {
