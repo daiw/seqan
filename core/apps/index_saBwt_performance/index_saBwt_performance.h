@@ -123,7 +123,7 @@ void computeBwt(StringSet<TText> &texts, TBWT &bwt, TSENT &sentinelPos) {
 	const clock_t begin_time = omp_get_wtime();
 #endif
 
-	createBwt(bwt, texts, sentinelPos, sentinelChar);
+	createBwt(bwt, sentinelPos, texts, sentinelChar);
 
 #ifdef _OPENMP
 	time = float(omp_get_wtime() - begin_time);
@@ -144,7 +144,7 @@ void computeBwt(TText &texts, TBWT &bwt, TSENT &sentinelPos) {
 	const clock_t begin_time = omp_get_wtime();
 #endif
 
-	createBwt(bwt, texts, sentinelPos, sentinelChar);
+	createBwt(bwt, sentinelPos, texts, sentinelChar);
 
 #ifdef _OPENMP
 	time = float(omp_get_wtime() - begin_time);
