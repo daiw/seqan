@@ -42,28 +42,29 @@ using namespace seqan;
 
 int main(int argc, char const ** argv)
 {
-	StringSet<String<Dna> > texts;
+    StringSet<String<Dna> > texts;
 
-	String<Dna> mtext1 = "TCTTA";
-	appendValue(texts, mtext1);
-	String<Dna> mtext2 = "CCCTA";
-	appendValue(texts, mtext2);
-	String<Dna> mtext3 = "CTTACTTA";
-	appendValue(texts, mtext3);
+    String<Dna> mtext1 = "TCTTA";
+    appendValue(texts, mtext1);
+    String<Dna> mtext2 = "CCCTA";
+    appendValue(texts, mtext2);
+    String<Dna> mtext3 = "CTTACTTA";
+    appendValue(texts, mtext3);
 
-	typedef typename SAValue<StringSet<String<Dna> > >::Type TSA;
+    typedef typename SAValue<StringSet<String<Dna> > >::Type TSA;
 
-	String<TSA> sa;
-	resize(sa, lengthSum(texts));
-	createSuffixArray(sa, texts, Bpr(), 5);
+    String<TSA> sa;
+    resize(sa, lengthSum(texts));
+    createSuffixArray(sa, texts, Bpr(), 5);
 
-	std::cout << "BPR SA:   " << std::endl;
-	for (unsigned i = 0; i < length(sa) && i < 800; ++i) {
-		std::cout << sa[i] << " ";
-		if (i > 0 && i % 100 == 0)
-			std::cout << std::endl;
-	}
-	std::cout << std::endl;
+    std::cout << "BPR SA:   " << std::endl;
+    for (unsigned i = 0; i < length(sa) && i < 800; ++i)
+    {
+        std::cout << sa[i] << " ";
+        if (i > 0 && i % 100 == 0)
+            std::cout << std::endl;
+    }
+    std::cout << std::endl;
 
     return 0;
 }

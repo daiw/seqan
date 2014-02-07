@@ -43,34 +43,36 @@ using namespace seqan;
 
 int main(int argc, char const ** argv)
 {
-	String<Dna> text1 = "TGCCAAC";
+    String<Dna> text1 = "TGCCAAC";
     String<Dna> text2 = "AGAGCTC";
     String<Dna> text3 = "GTCGCTT";
 
     StringSet<String<Dna> > texts;
-    appendValue(texts, text1); appendValue(texts, text2); appendValue(texts, text3);
+    appendValue(texts, text1);
+    appendValue(texts, text2);
+    appendValue(texts, text3);
 
     String<Dna> bwt;
     String<unsigned> sentinelPos;
-   	resize(bwt, lengthSum(texts) + countSequences(texts));
-   	resize(sentinelPos, countSequences(texts), Exact());
+    resize(bwt, lengthSum(texts) + countSequences(texts));
+    resize(sentinelPos, countSequences(texts), Exact());
 
-   	Dna sentinelChar = (Dna) 0;
+    Dna sentinelChar = (Dna) 0;
 
-   	createBwt(bwt, texts, sentinelPos, sentinelChar);
+    createBwt(bwt, texts, sentinelPos, sentinelChar);
 
-	int sentinelIndex = 0;
-	for(int i=0;i<length(bwt);++i)
-	{
-		if(bwt[i] == sentinelChar && sentinelIndex < length(sentinelPos) && sentinelPos[sentinelIndex] == i){
-			std::cout << "$";
-			++sentinelIndex;
-		}
-		else
-			std::cout << bwt[i];
-	}
-	std::cout << std::endl;
-
+    int sentinelIndex = 0;
+    for (int i = 0; i < length(bwt); ++i)
+    {
+        if (bwt[i] == sentinelChar && sentinelIndex < length(sentinelPos) && sentinelPos[sentinelIndex] == i)
+        {
+            std::cout << "$";
+            ++sentinelIndex;
+        }
+        else
+            std::cout << bwt[i];
+    }
+    std::cout << std::endl;
 
     return 0;
 }

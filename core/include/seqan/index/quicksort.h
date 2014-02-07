@@ -35,7 +35,8 @@
 #ifndef CORE_INCLUDE_SEQAN_INDEX_QUICKSORT_H_
 #define CORE_INCLUDE_SEQAN_INDEX_QUICKSORT_H_
 
-namespace seqan {
+namespace seqan
+{
 
 // ============================================================================
 // Forwards
@@ -61,170 +62,198 @@ typedef Tag<qsortSequential_> qsortSequential;
 // choose between quickSort and insertionSort
 //
 template<typename TToSort, typename TSortFunctor, typename TIndex>
-void doQuickSort(const qsortSequential &tag, TToSort &toSort, TSortFunctor &sortFunctor, const TIndex start, const TIndex end) {
-	if (end - start > 15)
-		quickSort(tag, toSort, sortFunctor, start, end);
-	else
-		insertionSort(toSort, sortFunctor, start, end);
+void doQuickSort(const qsortSequential &tag, TToSort &toSort, TSortFunctor &sortFunctor, const TIndex start,
+        const TIndex end)
+{
+    if (end - start > 15)
+        quickSort(tag, toSort, sortFunctor, start, end);
+    else
+        insertionSort(toSort, sortFunctor, start, end);
 }
 
 template<typename TToSort, typename TSortFunctor, typename TIndex>
-void doQuickSort(const qsortParallel, TToSort &toSort, TSortFunctor &sortFunctor, const TIndex start, const TIndex end) {
-	if (end - start > 15)
-		quickSort(qsortParallel(), toSort, sortFunctor, start, end, 0);
-	else
-		insertionSort(toSort, sortFunctor, start, end);
+void doQuickSort(const qsortParallel, TToSort &toSort, TSortFunctor &sortFunctor, const TIndex start, const TIndex end)
+{
+    if (end - start > 15)
+        quickSort(qsortParallel(), toSort, sortFunctor, start, end, 0);
+    else
+        insertionSort(toSort, sortFunctor, start, end);
 }
 
 template<typename TToSort, typename TSortFunctor, typename TIndex>
-void doQuickSort(const qsortParallel, TToSort &toSort, TSortFunctor &sortFunctor, const TIndex start, const TIndex end, const long depth) {
-	if (end - start > 15)
-		quickSort(qsortParallel(), toSort, sortFunctor, start, end, depth);
-	else
-		insertionSort(toSort, sortFunctor, start, end);
+void doQuickSort(const qsortParallel, TToSort &toSort, TSortFunctor &sortFunctor, const TIndex start, const TIndex end,
+        const long depth)
+{
+    if (end - start > 15)
+        quickSort(qsortParallel(), toSort, sortFunctor, start, end, depth);
+    else
+        insertionSort(toSort, sortFunctor, start, end);
 }
 
 template<typename Val>
-int medianOfThree(const Val a, const Val b, const Val c) {
-	if (a == b)
-		return 0;
-	if (a == c || b == c)
-		return 2;
-	if (a < b) {
-		if (b < c)
-			return 1;
-		else if (a < c)
-			return 2;
-		else
-			return 0;
-	} else if (b > c)
-		return 1;
-	else if (a < c)
-		return 0;
-	else
-		return 2;
+int medianOfThree(const Val a, const Val b, const Val c)
+{
+    if (a == b)
+        return 0;
+    if (a == c || b == c)
+        return 2;
+    if (a < b)
+    {
+        if (b < c)
+            return 1;
+        else if (a < c)
+            return 2;
+        else
+            return 0;
+    }
+    else if (b > c)
+        return 1;
+    else if (a < c)
+        return 0;
+    else
+        return 2;
 }
 
 template<typename TResult, typename TSA, typename TSortFunctor, typename TIndex>
-TResult _findPivot(TSA &SA, TSortFunctor &sortFunctor, const TIndex left, const TIndex right) {
+TResult _findPivot(TSA &SA, TSortFunctor &sortFunctor, const TIndex left, const TIndex right)
+{
 
-	typedef typename TSortFunctor::result_type TSortKey;
+    typedef typename TSortFunctor::result_type TSortKey;
 
-	const TIndex halfBucketSize = (right - left) / 2;
-	TSortKey pivot = sortFunctor(right); // getBptrVal(SA, bptr, limits, bptrExtPerString, offset, right);
-	const TSortKey pivotB = sortFunctor(left); //getBptrVal(SA, bptr, limits, bptrExtPerString, offset, left);
-	const TSortKey pivotC = sortFunctor(left + halfBucketSize); // getBptrVal(SA, bptr, limits, bptrExtPerString, offset, left + halfBucketSize);
-	int medianNumber = medianOfThree(pivot, pivotB, pivotC);
+    const TIndex halfBucketSize = (right - left) / 2;
+    TSortKey pivot = sortFunctor(right); // getBptrVal(SA, bptr, limits, bptrExtPerString, offset, right);
+    const TSortKey pivotB = sortFunctor(left); //getBptrVal(SA, bptr, limits, bptrExtPerString, offset, left);
+    const TSortKey pivotC = sortFunctor(left + halfBucketSize); // getBptrVal(SA, bptr, limits, bptrExtPerString, offset, left + halfBucketSize);
+    int medianNumber = medianOfThree(pivot, pivotB, pivotC);
 
-	if (medianNumber != 0) {
-		pivot = medianNumber == 1 ? pivotB : pivotC;
-		const TIndex swapIndex =
-				medianNumber == 1 ? left : left + halfBucketSize;
-		std::swap(SA[swapIndex], SA[right]);
-	}
-	return pivot;
+    if (medianNumber != 0)
+    {
+        pivot = medianNumber == 1 ? pivotB : pivotC;
+        const TIndex swapIndex = medianNumber == 1 ? left : left + halfBucketSize;
+        std::swap(SA[swapIndex], SA[right]);
+    }
+    return pivot;
 }
 
 template<typename TResult, typename TPivot, typename TSA, typename TSortFunctor, typename TIndex>
-TResult _partition(TSA &SA, const TPivot pivot, TSortFunctor &sortFunctor, const TIndex left, const TIndex right) {
+TResult _partition(TSA &SA, const TPivot pivot, TSortFunctor &sortFunctor, const TIndex left, const TIndex right)
+{
 
-		//lomutos partitioning scheme
-		TIndex leftTmp = left;
-		TIndex rightTmp = left;
-		while (rightTmp < right) {
-			if (sortFunctor(rightTmp) <= pivot) {
-				std::swap(SA[leftTmp], SA[rightTmp]);
+    //lomutos partitioning scheme
+    TIndex leftTmp = left;
+    TIndex rightTmp = left;
+    while (rightTmp < right)
+    {
+        if (sortFunctor(rightTmp) <= pivot)
+        {
+            std::swap(SA[leftTmp], SA[rightTmp]);
 
-				leftTmp++;
-			}
-			rightTmp++;
-		}
+            leftTmp++;
+        }
+        rightTmp++;
+    }
 
-		std::swap(SA[leftTmp], SA[rightTmp]);
+    std::swap(SA[leftTmp], SA[rightTmp]);
 
-		return leftTmp;
+    return leftTmp;
 }
 
 template<typename TSA, typename TSortFunctor, typename TIndex>
-void quickSort(const qsortSequential &tag, TSA &SA, TSortFunctor &sortFunctor, const TIndex left, const TIndex right) {
+void quickSort(const qsortSequential &tag, TSA &SA, TSortFunctor &sortFunctor, const TIndex left, const TIndex right)
+{
 
-	typedef typename TSortFunctor::result_type TSortKey;
+    typedef typename TSortFunctor::result_type TSortKey;
 
-	TSortKey pivot = _findPivot<TSortKey>(SA, sortFunctor, left, right);
+    TSortKey pivot = _findPivot<TSortKey>(SA, sortFunctor, left, right);
 
-	TIndex leftTmp = _partition<TIndex>(SA, pivot, sortFunctor, left, right);
+    TIndex leftTmp = _partition<TIndex>(SA, pivot, sortFunctor, left, right);
 
-	if (right - leftTmp > 1) {
-		doQuickSort(tag, SA, sortFunctor, leftTmp + 1, right);
-	}
-	do {
-		--leftTmp;
-	} while (leftTmp > left && sortFunctor(leftTmp) == pivot);
-	if (leftTmp - left > 0) {
-		doQuickSort(tag, SA, sortFunctor, left, leftTmp);
-	}
+    if (right - leftTmp > 1)
+    {
+        doQuickSort(tag, SA, sortFunctor, leftTmp + 1, right);
+    }
+    do
+    {
+        --leftTmp;
+    }
+    while (leftTmp > left && sortFunctor(leftTmp) == pivot);
+    if (leftTmp - left > 0)
+    {
+        doQuickSort(tag, SA, sortFunctor, left, leftTmp);
+    }
 }
 
 template<typename TSA, typename TSortFunctor, typename TIndex>
-void quickSort(const qsortParallel &tag, TSA &SA, TSortFunctor &sortFunctor, const TIndex left, const TIndex right, long depth) {
+void quickSort(const qsortParallel &tag, TSA &SA, TSortFunctor &sortFunctor, const TIndex left, const TIndex right,
+        long depth)
+{
 
-	if(depth > 10){
-		//Avoid the creation of too many tasks. Their overhead would make it very slow
-		quickSort(qsortSequential(), SA, sortFunctor, left, right);
-		return;
-	}
+    if (depth > 10)
+    {
+        //Avoid the creation of too many tasks. Their overhead would make it very slow
+        quickSort(qsortSequential(), SA, sortFunctor, left, right);
+        return;
+    }
 
-	typedef typename TSortFunctor::result_type TSortKey;
+    typedef typename TSortFunctor::result_type TSortKey;
 
-	TSortKey pivot = _findPivot<TSortKey>(SA, sortFunctor, left, right);
+    TSortKey pivot = _findPivot<TSortKey>(SA, sortFunctor, left, right);
 
-	TIndex leftTmp = _partition<TIndex>(SA, pivot, sortFunctor, left, right);
+    TIndex leftTmp = _partition<TIndex>(SA, pivot, sortFunctor, left, right);
 
-	const TIndex leftTmpCopy = leftTmp;
+    const TIndex leftTmpCopy = leftTmp;
 
-	SEQAN_OMP_PRAGMA(task shared(SA, tag, sortFunctor)) {
-		if (right - leftTmp > 1) {
-			doQuickSort(tag, SA, sortFunctor, leftTmpCopy + 1, right, depth + 1);
-		}
-	}
+    SEQAN_OMP_PRAGMA(task shared(SA, tag, sortFunctor))
+    {
+        if (right - leftTmp > 1)
+        {
+            doQuickSort(tag, SA, sortFunctor, leftTmpCopy + 1, right, depth + 1);
+        }
+    }
 //	SEQAN_OMP_PRAGMA(task shared(SA, tag, sortFunctor)) {
-		do {
-			--leftTmp;
-		} while (leftTmp > left && sortFunctor(leftTmp) == pivot);
-		if (leftTmp - left > 0) {
-			doQuickSort(tag, SA, sortFunctor, left, leftTmp, depth + 1);
-		}
+    do
+    {
+        --leftTmp;
+    }
+    while (leftTmp > left && sortFunctor(leftTmp) == pivot);
+    if (leftTmp - left > 0)
+    {
+        doQuickSort(tag, SA, sortFunctor, left, leftTmp, depth + 1);
+    }
 //	}
 }
 
 template<typename TSA, typename TSortFunctor, typename TIndex>
-void insertionSort(TSA &SA, TSortFunctor &sortFunctor, const TIndex left, const TIndex right) {
+void insertionSort(TSA &SA, TSortFunctor &sortFunctor, const TIndex left, const TIndex right)
+{
 
-	typedef typename Value<TSA>::Type TSAVal;
-	typedef typename TSortFunctor::result_type TSortKey;
+    typedef typename Value<TSA>::Type TSAVal;
+    typedef typename TSortFunctor::result_type TSortKey;
 
-	TIndex j = 0;
-	TSortKey sortkey;
-	TSAVal tmp;
+    TIndex j = 0;
+    TSortKey sortkey;
+    TSAVal tmp;
 
-	for (TIndex i = left + 1; i <= right; ++i) {
-		sortkey = sortFunctor(i);
-		tmp = SA[i];
-		j = i - 1;
+    for (TIndex i = left + 1; i <= right; ++i)
+    {
+        sortkey = sortFunctor(i);
+        tmp = SA[i];
+        j = i - 1;
 
-		int c = 1;
-		while ((j >= left) && (sortFunctor(j) > sortkey)) {
-			SA[j + 1] = SA[j];
-			if (j == 0) {
-				c = 0;
-				break; //underflow with unsigned
-			}
-			--j;
-		}
-		SA[j + c] = tmp;
-	}
+        int c = 1;
+        while ((j >= left) && (sortFunctor(j) > sortkey))
+        {
+            SA[j + 1] = SA[j];
+            if (j == 0)
+            {
+                c = 0;
+                break; //underflow with unsigned
+            }
+            --j;
+        }
+        SA[j + c] = tmp;
+    }
 }
-
 
 }  // namespace seqan
 
