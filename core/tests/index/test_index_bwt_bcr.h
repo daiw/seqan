@@ -58,7 +58,7 @@ void computeBwt(TText &texts, TBWT &bwt, TSENT &sentinelPos)
     const clock_t begin_time = omp_get_wtime();
 #endif
 
-    createBwt(bwt, texts, sentinelPos, sentinelChar);
+    createBwt(bwt, sentinelPos, texts, sentinelChar);
 
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
     std::cout << " done. " << float(omp_get_wtime() - begin_time) << std::endl;
@@ -69,7 +69,6 @@ void computeBwt(TText &texts, TBWT &bwt, TSENT &sentinelPos)
 template<typename TText, typename TBWT, typename TSENT>
 void computeBwtViaSA(StringSet<TText> &texts, TBWT &bwt, TSENT &sentinelPos)
 {
-
     typedef typename Value<TText>::Type TAlphabet;
     typedef typename SAValue<StringSet<TText> >::Type TSAValue;
     String<TSAValue> sa;
@@ -143,9 +142,8 @@ void computeBwtViaSA(TText texts, TBWT &bwt, TSENT &sentinelPos)
 }
 
 template<typename TBWT, typename TSENT>
-void compareBwt(TBWT &bwt, TSENT &sentinelPos, TBWT &bwt2, TSENT &sentinelPos2)
+void compareBwt(TBWT const & bwt, TSENT const & sentinelPos, TBWT const & bwt2, TSENT const & sentinelPos2)
 {
-
     SEQAN_ASSERT_EQ_MSG(length(bwt), length(bwt2), "The bwts have a different length.");
 
     SEQAN_ASSERT_EQ_MSG(length(sentinelPos), length(sentinelPos2), "The sentinel lists have a different length.");

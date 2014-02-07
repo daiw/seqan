@@ -53,7 +53,6 @@ template<typename InType, typename TSa, typename TBptr, typename TLimits, typena
         typename OutType = typename Value<TBptr>::Type>
 struct _bprComparator : public std::unary_function<InType, OutType>
 {
-
     const TSa &SA;
     const TBptr &bptr;
     const TLimits &limits;
@@ -108,7 +107,7 @@ struct AlphabetType<String<TString, TSpec> >
 //
 // d defines the suffixlength for the initial bucket sort
 template<typename TSA, typename TText>
-void createSuffixArray(TSA &SA, TText &s, Bpr const &, const unsigned short d)
+void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
 {
     typedef typename Value<TSA>::Type TSAValue;
     typedef typename AlphabetType<TText>::Type TAlphabet;
@@ -131,8 +130,7 @@ void createSuffixArray(TSA &SA, TText &s, Bpr const &, const unsigned short d)
 //
 /////////////////////////
 
-//set contains the count of the alphabetsize^d buckets
-    String<TTextSize> bkt;
+    String<TTextSize> bkt; //set contains the count of the alphabetsize^d buckets
 
     //contains for each entry in text, the index of the last entry of the corresponding Bucket in SA
     //remark: contains negative values to get the right order of the $signs
@@ -142,7 +140,7 @@ void createSuffixArray(TSA &SA, TText &s, Bpr const &, const unsigned short d)
     const double begin_time = omp_get_wtime();
 #endif
 
-    fillBucketsPhase1(SA, s, bptr, bkt, limits, d, ALPHSIZEWITHDOLLAR);
+    fillBucketsPhase1(SA, bptr, bkt, s, limits, d, ALPHSIZEWITHDOLLAR);
 
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
     std::cout << "\t Phase 1: " << double(omp_get_wtime() - begin_time)
@@ -159,7 +157,7 @@ void createSuffixArray(TSA &SA, TText &s, Bpr const &, const unsigned short d)
     const double begin_time_2 = omp_get_wtime();
 #endif
 
-    sewardCopyPhase2(SA, s, bptr, bkt, limits, d, ALPHSIZEWITHDOLLAR);
+    sewardCopyPhase2(SA, bptr, s, bkt, limits, d, ALPHSIZEWITHDOLLAR);
 
     clear(bkt);
     clear(bptr);
@@ -177,10 +175,9 @@ void createSuffixArray(TSA &SA, TText &s, Bpr const &, const unsigned short d)
  * Set bucketpointer to buckets last position in SA
  */
 template<typename TSA, typename TText, typename TBptr, typename TBkt, typename TLimit, typename TD, typename TAlpha>
-inline void fillBucketsPhase1(TSA &SA, const TText &s, TBptr &bptr, TBkt &bkt, const TLimit &limits, const TD d,
+inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & s, const TLimit & limits, const TD d,
         const TAlpha alphabeSizeWithDollar)
 {
-
     typedef typename SAValue<TText>::Type TSAValue;
     typedef typename Size<TText>::Type TTextSize;
 
@@ -354,7 +351,7 @@ inline void fillBucketsPhase1(TSA &SA, const TText &s, TBptr &bptr, TBkt &bkt, c
 //d: länge
 //i: pos in s
 template<typename TText, typename TPos, typename TAlphabetSize>
-unsigned int code_d(TText &s, const unsigned short &d, TPos pos, const TAlphabetSize &alphabetSize)
+unsigned int code_d(TText const & s, unsigned short const & d, TPos const & pos, TAlphabetSize const & alphabetSize)
 {
     unsigned int result = 0;
     unsigned local = getSeqOffset(pos);
@@ -376,8 +373,8 @@ unsigned int code_d(TText &s, const unsigned short &d, TPos pos, const TAlphabet
 //i: pos in s
 //code_d_i: wert vom vorherigen suffix
 template<typename TText, typename TPos, typename TAlphabetSize>
-unsigned code_d(TText &s, const unsigned short &d, TPos pos, const TAlphabetSize &alphabetSize, long modulo,
-        unsigned code_d_i)
+unsigned code_d(TText const & s, unsigned short const & d, TPos const & pos, TAlphabetSize const & alphabetSize, long const & modulo,
+        unsigned const & code_d_i)
 {
     unsigned local = getSeqOffset(pos);
     if (local == 0)
@@ -392,10 +389,9 @@ unsigned code_d(TText &s, const unsigned short &d, TPos pos, const TAlphabetSize
 }
 
 template<typename TSA, typename TText, typename TBptr, typename TBkt, typename TLimit, typename TD, typename TAlpha>
-inline void sewardCopyPhase2(TSA &SA, const TText &s, TBptr &bptr, const TBkt &bkt, const TLimit &limits, const TD d,
-        const TAlpha alphabeSizeWithDollar)
+inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const & bkt, TLimit const & limits, TD const d,
+        TAlpha const alphabeSizeWithDollar)
 {
-
     typedef typename Value<TSA>::Type TSAValue;
     typedef typename AlphabetType<TText>::Type TAlphabet;
     typedef typename ValueSize<TAlphabet>::Type TAlphabetSize;
@@ -464,7 +460,6 @@ inline void sewardCopyPhase2(TSA &SA, const TText &s, TBptr &bptr, const TBkt &b
 
     while (length(bucketIndices) > 0)
     {
-
         //Split buckets in reasonable chunks, after each chunk sync refined bptr
         clear(split);
         appendValue(split, 0);
@@ -486,13 +481,11 @@ inline void sewardCopyPhase2(TSA &SA, const TText &s, TBptr &bptr, const TBkt &b
 
         for (unsigned i = 1; i < length(split); ++i)
         {
-
             long startIndex = split[i - 1];
             long endIndex = split[i];
 
         SEQAN_OMP_PRAGMA(parallel shared(bucketIndices, nextBucketIndices, SA, bptr, limits))
         {
-
             //parallely sort all collected buckets
             SEQAN_OMP_PRAGMA(for schedule(guided))
             for (unsigned k = startIndex; k < endIndex; ++k)
@@ -671,10 +664,10 @@ inline void sewardCopyPhase2(TSA &SA, const TText &s, TBptr &bptr, const TBkt &b
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
     std::cout << " seward: " << float(omp_get_wtime() - begin_time2)<<std::endl;
 #endif
-    }
+}
 
 template<typename TText>
-TText getOrdererdAlphabet(const String<long> &bkt, const StringSet<TText> &s, const unsigned short &d)
+TText getOrdererdAlphabet(String<long> const & bkt, StringSet<TText> const & s, unsigned short const & d)
 {
     return getOrdererdAlphabet(bkt, s[0], d);
 }
@@ -683,7 +676,7 @@ TText getOrdererdAlphabet(const String<long> &bkt, const StringSet<TText> &s, co
 // Theirfore it uses the sizes of the different Buckets
 //
 template<typename TText>
-TText getOrdererdAlphabet(const String<long> &bkt, const TText, const unsigned short &d)
+TText getOrdererdAlphabet(String<long> const & bkt, TText const &, unsigned short const & d)
 {
     typedef typename AlphabetType<TText>::Type TAlphabet;
     typedef typename ValueSize<TAlphabet>::Type TAlphabetSize;
@@ -747,8 +740,8 @@ TText getOrdererdAlphabet(const String<long> &bkt, const TText, const unsigned s
 //update bptr after sort
 //this part has its origin in the original algorithm by schürmann and stoye: updatePtrAndRefineBuckets_SaBucket
 template<typename TSA, typename TBptr, typename TSize, typename TLimits>
-Pair<TSize, TSize> refineBucket(TSA &SA, TBptr &bptr, String<Pair<TSize, TSize> > &nextBptr, TLimits &limits,
-        TSize left, TSize right, unsigned int offset, unsigned short d)
+Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<TSize, TSize> > & nextBptr, TLimits const & limits,
+        TSize const & left, TSize const & right, unsigned int const & offset, unsigned short const & d)
 {
     unsigned bptrExtPerString = (2 * d + 1);
 
@@ -824,10 +817,9 @@ Pair<TSize, TSize> refineBucket(TSA &SA, TBptr &bptr, String<Pair<TSize, TSize> 
 
 //finds the longest common prefix and increases the current offset
 template<typename TSa, typename TBptr, typename TSize, typename TLimits>
-unsigned int computeLCPAndOffset(TSa &SA, TBptr &bptr, const TLimits &limits, const TSize left,
-        const TSize right, const unsigned int offset, const unsigned short d)
+unsigned int computeLCPAndOffset(TSa const & SA, TBptr const & bptr, TLimits const & limits, TSize const & left,
+        TSize const & right, unsigned int const & offset, unsigned short const & d)
 {
-
     typedef typename Value<TBptr>::Type TBptrVal;
 
     unsigned bptrExtPerString = (2 * d + 1);
@@ -853,10 +845,9 @@ unsigned int computeLCPAndOffset(TSa &SA, TBptr &bptr, const TLimits &limits, co
 
 //Sort and Refine a Bucket with Size 2 without recursion
 template<typename TSA, typename TBptr, typename TIndex, typename TLimits>
-void sortSizeTwo(TSA &SA, TBptr &bptr, const TLimits &limits, const unsigned short d, const unsigned int offset,
-        const TIndex left, const TIndex right)
+void sortSizeTwo(TSA &SA, TBptr const & bptr, TLimits const & limits, unsigned short const & d, unsigned int const & offset,
+        TIndex const & left, TIndex const & right)
 {
-
     typedef typename Value<TSA>::Type TSAVal;
 
     unsigned bptrExtPerString = (2 * d + 1);
@@ -884,10 +875,9 @@ void sortSizeTwo(TSA &SA, TBptr &bptr, const TLimits &limits, const unsigned sho
 //
 template<typename TSA, typename TBptrVal, typename TLimits, typename TExtString, typename TOffset,
         typename TIndex>
-TBptrVal getBptrVal(const TSA &SA, const String<TBptrVal> &bptr, const TLimits &limits,
-        const TExtString bptrExtPerString, TOffset offset, TIndex index)
+TBptrVal getBptrVal(TSA const & SA, String<TBptrVal> const & bptr, TLimits const & limits,
+        TExtString const & bptrExtPerString, TOffset const & offset, TIndex const & index)
 {
-
     const long bptrOffset = getSeqNo(SA[index]) * bptrExtPerString;
     return bptr[posGlobalize(SA[index], limits) + offset + bptrOffset];
 }

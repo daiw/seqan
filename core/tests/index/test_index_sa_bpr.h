@@ -42,9 +42,8 @@
 using namespace seqan;
 
 template<typename TText>
-void testCodeD(TText text)
+void testCodeD(TText const & text)
 {
-
     typedef typename Value<TText>::Type TValue;
     typedef typename ValueSize<TValue>::Type TAlphabetSize;
 
@@ -65,9 +64,8 @@ void testCodeD(TText text)
 }
 
 template<typename TText>
-void compareSuffixArrays(TText text, unsigned short d)
+void compareSuffixArrays(TText const & text, unsigned short const d)
 {
-
     typedef typename SAValue<TText>::Type TSA;
     String<TSA> sa;
     String<TSA> sa2;
@@ -109,14 +107,7 @@ void compareSuffixArrays(TText text, unsigned short d)
     for (unsigned i = 0; i < length(sa) && errors < 100; ++i)
     {
         SEQAN_ASSERT_EQ(sa[i], sa2[i]);
-//		if (sa[i] != sa2[i]) {
-//			std::cerr << "SuffixArray error at index " << i << std::endl;
-//			++errors;
-//		}
-//		std::cerr.flush();
     }
-//	if (errors == 0)
-//		std::cout << "FEHLERFREI!" << std::endl;
 }
 
 // A test for code_D.
