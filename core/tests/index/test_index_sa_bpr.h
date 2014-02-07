@@ -39,88 +39,90 @@
 #include <seqan/sequence.h>
 #include <seqan/index.h>
 
-
 using namespace seqan;
 
 template<typename TText>
-void testCodeD(TText text){
+void testCodeD(TText text)
+{
 
     typedef typename Value<TText>::Type TValue;
     typedef typename ValueSize<TValue>::Type TAlphabetSize;
 
     const TAlphabetSize ALPHABETSIZE = ValueSize<TValue>::VALUE + 1;
 
-	for (short d = 1; d < 4; ++d) {
-		long tmpModulo = pow(ALPHABETSIZE, (d - 1));
-		int last = code_d(text, d, 0, ALPHABETSIZE);
-		for (unsigned i = 1; i < length(text); ++i) {
-			int current_rek = code_d(text, d, i, ALPHABETSIZE, tmpModulo, last);
-			int current_it = code_d(text, d, i, ALPHABETSIZE);
-			SEQAN_ASSERT_EQ(current_it, current_rek);
-			last = current_it;
-		}
-	}
+    for (short d = 1; d < 4; ++d)
+    {
+        long tmpModulo = pow(ALPHABETSIZE, (d - 1));
+        int last = code_d(text, d, 0, ALPHABETSIZE);
+        for (unsigned i = 1; i < length(text); ++i)
+        {
+            int current_rek = code_d(text, d, i, ALPHABETSIZE, tmpModulo, last);
+            int current_it = code_d(text, d, i, ALPHABETSIZE);
+            SEQAN_ASSERT_EQ(current_it, current_rek);
+            last = current_it;
+        }
+    }
 }
 
 template<typename TText>
-void compareSuffixArrays(TText text, unsigned short d) {
+void compareSuffixArrays(TText text, unsigned short d)
+{
 
-	typedef typename SAValue<TText>::Type TSA;
-	String<TSA> sa;
-	String<TSA> sa2;
+    typedef typename SAValue<TText>::Type TSA;
+    String<TSA> sa;
+    String<TSA> sa2;
 
-	resize(sa, lengthSum(text));
-
-#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
-	const clock_t begin_time = omp_get_wtime();
-	std::cout << "Computing BPR... ";
-	std::cout.flush();
-#endif
-
-	createSuffixArray(sa, text, Bpr(), d);
+    resize(sa, lengthSum(text));
 
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
-	std::cout << " done. " << float(omp_get_wtime() - begin_time);
-	std::cout << std::endl;
-	std::cout.flush();
+    const clock_t begin_time = omp_get_wtime();
+    std::cout << "Computing BPR... ";
+    std::cout.flush();
 #endif
 
-	resize(sa2, lengthSum(text));
+    createSuffixArray(sa, text, Bpr(), d);
 
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
-	const clock_t begin_time2 = omp_get_wtime();
-	std::cout << "Computing Skew3...   ";
-	std::cout.flush();
+    std::cout << " done. " << float(omp_get_wtime() - begin_time);
+    std::cout << std::endl;
+    std::cout.flush();
 #endif
 
-	createSuffixArray(sa2, text, Skew3());
+    resize(sa2, lengthSum(text));
 
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
-	std::cout << " done. " << float(omp_get_wtime() - begin_time2);
-	std::cout << std::endl;
-	std::cout.flush();
+    const clock_t begin_time2 = omp_get_wtime();
+    std::cout << "Computing Skew3...   ";
+    std::cout.flush();
 #endif
 
-	//Check for differences:
-	unsigned errors = 0;
-	for (unsigned i = 0; i < length(sa) && errors < 100; ++i) {
-		SEQAN_ASSERT_EQ(sa[i], sa2[i]);
+    createSuffixArray(sa2, text, Skew3());
+
+#if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
+    std::cout << " done. " << float(omp_get_wtime() - begin_time2);
+    std::cout << std::endl;
+    std::cout.flush();
+#endif
+
+    //Check for differences:
+    unsigned errors = 0;
+    for (unsigned i = 0; i < length(sa) && errors < 100; ++i)
+    {
+        SEQAN_ASSERT_EQ(sa[i], sa2[i]);
 //		if (sa[i] != sa2[i]) {
 //			std::cerr << "SuffixArray error at index " << i << std::endl;
 //			++errors;
 //		}
 //		std::cerr.flush();
-	}
+    }
 //	if (errors == 0)
 //		std::cout << "FEHLERFREI!" << std::endl;
 }
 
-
 // A test for code_D.
-SEQAN_DEFINE_TEST(test_index_sa_bpr_codeD)
-{
+SEQAN_DEFINE_TEST(test_index_sa_bpr_codeD){
 
-	using namespace seqan;
+    using namespace seqan;
 
     String<Dna> text = "ACGTGCTG";
     testCodeD(text);
@@ -136,10 +138,9 @@ SEQAN_DEFINE_TEST(test_index_sa_bpr_codeD)
 }
 
 // This test compares SuffixArrays Computed via Bpr with SuffixArrays computed via Skew
-SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSA)
-{
+SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSA){
 
-	using namespace seqan;
+    using namespace seqan;
 
     String<Dna> text = "ACGTGCTG";
     compareSuffixArrays(text, 5);
@@ -155,14 +156,13 @@ SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSA)
 }
 
 // This test compares SuffixArrays Computed via Bpr with SuffixArrays computed via Skew
-SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSAStringSets)
-{
-	using namespace seqan;
+SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSAStringSets){
+    using namespace seqan;
 
     StringSet<String<Dna> > text;
 
-//    resize(text, 0);
-//	compareSuffixArrays(text, 5);
+    //    resize(text, 0);
+    //	compareSuffixArrays(text, 5);
 
     resize(text, 1);
     text[0] = "";
@@ -182,36 +182,35 @@ SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSAStringSets)
     compareSuffixArrays(text, 5);
 
     text[1] = "ATGCAACGTVA";
-	compareSuffixArrays(text, 5);
+    compareSuffixArrays(text, 5);
 
-	text[1] = "ACTAGCAGACGATAC";
-	compareSuffixArrays(text, 5);
+    text[1] = "ACTAGCAGACGATAC";
+    compareSuffixArrays(text, 5);
 
-	StringSet<String<char> > text2;
+    StringSet<String<char> > text2;
 
-	resize(text2, 1);
-	text2[0] = "";
-	compareSuffixArrays(text2, 3);
+    resize(text2, 1);
+    text2[0] = "";
+    compareSuffixArrays(text2, 3);
 
-	text2[0] = "b";
-	compareSuffixArrays(text2, 3);
+    text2[0] = "b";
+    compareSuffixArrays(text2, 3);
 
-	text2[0] = "halloWelt!";
-	compareSuffixArrays(text2, 3);
+    text2[0] = "halloWelt!";
+    compareSuffixArrays(text2, 3);
 
-	resize(text2, 2);
-	text2[1] = "";
-	compareSuffixArrays(text2, 3);
+    resize(text2, 2);
+    text2[1] = "";
+    compareSuffixArrays(text2, 3);
 
-	text2[1] = "x";
-	compareSuffixArrays(text2, 3);
+    text2[1] = "x";
+    compareSuffixArrays(text2, 3);
 
-	text2[1] = "halloWelt!";
-	compareSuffixArrays(text2, 3);
+    text2[1] = "halloWelt!";
+    compareSuffixArrays(text2, 3);
 
-	text2[1] = "halloWelt!12345";
-	compareSuffixArrays(text2, 3);
+    text2[1] = "halloWelt!12345";
+    compareSuffixArrays(text2, 3);
 }
-
 
 #endif  // CORE_TESTS_INDEX_SA_BPR_TEST_INDEX_SA_BPR_H_
