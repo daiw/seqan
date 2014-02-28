@@ -75,43 +75,23 @@ struct _bprComparator : public std::unary_function<InType, OutType>
 // Metafunctions
 // ============================================================================
 
-// TODO: Alphabet should refer to Value by default.
-template<typename TObject>
-struct AlphabetType
-{
-    typedef TObject Type;
-};
-
-template<typename TString, typename TSpec>
-struct AlphabetType<StringSet<TString, TSpec> >
-{
-    typedef typename Value<TString>::Type Type;
-};
-
-template<typename TString, typename TSpec>
-struct AlphabetType<String<TString, TSpec> >
-{
-    typedef typename Value<String<TString, TSpec> >::Type Type;
-};
-
 // ============================================================================
 // Functions
 // ============================================================================
 
-//////////////////////////////////////////////////////////////////////////////
-// Bucket Pointer Refinement Implementation
-// find the suffix array SA of s[0..n-1] in {0..K}^n
-//
-// creates suffix array SA of s
-// chars have to be in the range [0,K)
-//
-// d defines the suffixlength for the initial bucket sort
+/**
+.Function.createSuffixArray:
+..summary:Computes the SuffixArray for given input
+..description:
+Creates a suffixarray for the input text. The algorithm is based on the bucket pointer refinement algorithm by
+Schürmann and Stoye. It is modified and extended for parallel computation.
+..createSuffixArray(SA, text, tag, qgram-length)
+..param.qgram-length: Suffixlength for initial bucket sort.
+*/
 template<typename TSA, typename TText>
 void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
 {
     typedef typename Value<TSA>::Type TSAValue;
-    typedef typename AlphabetType<TText>::Type TAlphabet;
-    typedef typename ValueSize<TAlphabet>::Type TAlphabetSize;
     typedef typename Size<TText>::Type TTextSize;
     typedef typename StringSetLimits<TText>::Type TStringSetLimits;
 
@@ -119,8 +99,6 @@ void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
         return;
 
     const TStringSetLimits limits = stringSetLimits(s);
-    const TAlphabetSize ALPHABETSIZE = ValueSize<TAlphabet>::VALUE;
-    const TAlphabetSize ALPHSIZEWITHDOLLAR = ValueSize<TAlphabet>::VALUE + 1;
 
     //TODO: remove primitive types
 
@@ -140,7 +118,7 @@ void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
     const double begin_time = omp_get_wtime();
 #endif
 
-    fillBucketsPhase1(SA, bptr, bkt, s, limits, d, ALPHSIZEWITHDOLLAR);
+    fillBucketsPhase1(SA, bptr, bkt, s, limits, d, getAlphabetSize(s)+1);
 
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
     std::cout << "\t Phase 1: " << double(omp_get_wtime() - begin_time)
@@ -157,7 +135,7 @@ void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
     const double begin_time_2 = omp_get_wtime();
 #endif
 
-    sewardCopyPhase2(SA, bptr, s, bkt, limits, d, ALPHSIZEWITHDOLLAR);
+    sewardCopyPhase2(SA, bptr, s, bkt, limits, d, getAlphabetSize(s)+1);
 
     clear(bkt);
     clear(bptr);
@@ -168,6 +146,20 @@ void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
 #endif
 
 }
+
+template<typename TString>
+unsigned getAlphabetSize(TString const &){
+    typedef typename Value<TString>::Type ARGH;
+    return ValueSize<ARGH>::VALUE;
+}
+
+
+template<typename TString>
+unsigned getAlphabetSize(StringSet<TString> const &){
+    typedef typename Value<TString>::Type ARGH;
+    return ValueSize<ARGH>::VALUE;
+}
+
 
 /*
  * sort suffixes with length d and create Bucketpointer
@@ -181,8 +173,7 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
     typedef typename SAValue<TText>::Type TSAValue;
     typedef typename Size<TText>::Type TTextSize;
 
-    //after each sequence we insert 2*d+1 values to sort the $ correctly
-    const unsigned bptrExtPerString = (2 * d + 1);
+    const unsigned bptrExtPerString = (2 * d + 1);//after each sequence we insert 2*d+1 values to sort the $ correctly
 
     const long tmpModulo = pow(alphabeSizeWithDollar, (d - 1));
     const long bucketCount = tmpModulo * alphabeSizeWithDollar;
@@ -393,16 +384,11 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
         TAlpha const alphabeSizeWithDollar)
 {
     typedef typename Value<TSA>::Type TSAValue;
-    typedef typename AlphabetType<TText>::Type TAlphabet;
-    typedef typename ValueSize<TAlphabet>::Type TAlphabetSize;
     typedef typename Size<TText>::Type TTextSize;
     typedef typename Value<TBptr>::Type TBptrValue;
 
-    const TAlphabetSize ALPHABETSIZE = ValueSize<TAlphabet>::VALUE;
+    const TAlpha ALPHABETSIZE = getAlphabetSize(s);
     const unsigned bptrExtPerString = (2 * d + 1);
-
-    //Find L1 and L2 Buckets to Sort the characters according to their count
-    String<TAlphabet> orderedAlphabet = getOrdererdAlphabet(bkt, s, d);
 
     const long bucketsInL2Bucket = pow(alphabeSizeWithDollar, d - 2); //d minus 2, since these chars are equal in L2
     const long bucketsInL1Bucket = bucketsInL2Bucket * alphabeSizeWithDollar;
@@ -416,13 +402,13 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
     String<Triple<long, long, long> > &bucketIndicesCur = bucketIndicesSet[0];
     for (unsigned i = 0; i < ALPHABETSIZE; ++i)
     {
-        const TAlphabetSize firstChar = 1 + ordValue(orderedAlphabet[ALPHABETSIZE - 1 - i]);
+        const TAlpha firstChar = 1 + i;
 
-        for (TAlphabetSize j = 0; j < ALPHABETSIZE; ++j)
+        for (TAlpha j = 0; j < ALPHABETSIZE; ++j)
         {
             if (j == i)
                 continue;
-            const TAlphabetSize secondChar = 1 + ordValue(orderedAlphabet[ALPHABETSIZE - 1 - j]);
+            const TAlpha secondChar = 1 + j;
 
             const long bktStartIndex = firstChar * bucketsInL1Bucket + secondChar * bucketsInL2Bucket; //startbucket for suffixes starting with firstchar, secondchar
             const long bktEndIndex = bktStartIndex + bucketsInL2Bucket;
@@ -608,7 +594,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
     SEQAN_OMP_PRAGMA(parallel for)
     for (unsigned i = 0; i < ALPHABETSIZE; ++i)
     {
-        const TAlphabetSize firstChar = 1 + ordValue(orderedAlphabet[i]);
+        const TAlpha firstChar = 1 + i;
 
         long leftVal = bkt[firstChar * bucketsInL1Bucket
         + firstChar * bucketsInL2Bucket];
@@ -628,7 +614,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
                 ++left;
                 continue;
             }
-            TAlphabetSize character = 1
+            TAlpha character = 1
             + ordValue(getSequenceByNo(seqNum, s)[--seqOffset]);
             if (firstChar == character)
             {
@@ -647,7 +633,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
             TSAValue tmp = SA[right];
             TTextSize seqOffset = getSeqOffset(tmp);
             const long seqNum = getSeqNo(tmp);
-            TAlphabetSize character;
+            TAlpha character;
             if (seqOffset > 0 && firstChar == (character =
                     1 + ordValue(getSequenceByNo(seqNum, s)[--seqOffset])))
             {
@@ -666,77 +652,6 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
 #endif
 }
 
-template<typename TText>
-TText getOrdererdAlphabet(String<long> const & bkt, StringSet<TText> const & s, unsigned short const & d)
-{
-    return getOrdererdAlphabet(bkt, s[0], d);
-}
-
-// Sorts all characters according to their count within the text
-// Theirfore it uses the sizes of the different Buckets
-//
-template<typename TText>
-TText getOrdererdAlphabet(String<long> const & bkt, TText const &, unsigned short const & d)
-{
-    typedef typename AlphabetType<TText>::Type TAlphabet;
-    typedef typename ValueSize<TAlphabet>::Type TAlphabetSize;
-    const TAlphabetSize ALPHABETSIZE = ValueSize<TAlphabet>::VALUE;
-
-    String<TAlphabet> orderedAlphabet;
-    resize(orderedAlphabet, ALPHABETSIZE, 0);
-    String<long> alphabetWeights;
-    resize(alphabetWeights, ALPHABETSIZE, 0);
-
-    String<TAlphabet> t1;
-    resize(t1, d, (TAlphabet) 0);    //ie: "aaa"
-    String<TAlphabet> t2;
-    resize(t2, d, (TAlphabet) (ALPHABETSIZE - 1));    //ie "zzz"
-    String<TAlphabet> t3;
-    resize(t3, d, (TAlphabet) 0);    //ie: "aaa"
-    String<TAlphabet> t4;
-    resize(t4, d, (TAlphabet) (ALPHABETSIZE - 1));    //ie "zzz"
-
-    for (TAlphabetSize i = 0; i < ALPHABETSIZE; ++i)
-    {
-        t1[0] = (TAlphabet) i;    //ie: "caa"
-        t2[0] = (TAlphabet) i;    //ie: "czz"
-
-        t3[0] = (TAlphabet) i;
-        t4[0] = (TAlphabet) i;
-        t3[1] = (TAlphabet) i;    //ie: "cca"
-        t4[1] = (TAlphabet) i;    //ie: "ccz"
-        unsigned int codeD_t1 = code_d(t1, d, 0, ALPHABETSIZE + 1);
-        unsigned int codeD_t2 = code_d(t2, d, 0, ALPHABETSIZE + 1);
-
-        unsigned int codeD_t3 = code_d(t3, d, 0, ALPHABETSIZE + 1);
-        unsigned int codeD_t4 = code_d(t4, d, 0, ALPHABETSIZE + 1);
-
-        if (codeD_t2 < length(bkt) - 1)
-            ++codeD_t2;
-        if (codeD_t4 < length(bkt) - 1)
-            ++codeD_t4;
-
-        alphabetWeights[i] = (bkt[codeD_t2] - bkt[codeD_t1]) - (bkt[codeD_t4] - bkt[codeD_t3]);
-        orderedAlphabet[i] = (TAlphabet) i;
-        //alphabetWeights[i] = Number of buckets starting with i-th character - number of Buckets starting with 2x i-th character
-    }
-
-    //now sort characters according to their weight
-    for (TAlphabetSize i = 1; i < ALPHABETSIZE; ++i)
-    {
-        const long tmpWeight = alphabetWeights[i];
-        TAlphabetSize j = i;
-        while (j > 0 && tmpWeight < alphabetWeights[ordValue(orderedAlphabet[j - 1])])
-        {
-            orderedAlphabet[j] = orderedAlphabet[j - 1];
-            --j;
-        }
-        orderedAlphabet[j] = (TAlphabet) i;
-    }
-
-    return orderedAlphabet;
-}
-
 //update bptr after sort
 //this part has its origin in the original algorithm by schürmann and stoye: updatePtrAndRefineBuckets_SaBucket
 template<typename TSA, typename TBptr, typename TSize, typename TLimits>
@@ -747,7 +662,7 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
 
     if (right - left == 1)
     {
-        long bptrOffset1 = getSeqNo(SA[left]) * bptrExtPerString;
+        unsigned bptrOffset1 = getSeqNo(SA[left]) * bptrExtPerString;
         appendValue(nextBptr, Pair<TSize, TSize>(bptrOffset1 + posGlobalize(SA[left], limits), left));
         return Pair<TSize, TSize>(0, 0);
     }
@@ -766,11 +681,11 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
     TSize middleLeft;
 
     while (left <= leftInterval
-            && right < (tmp = getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval)))
-    { // bptr[SA[leftInterval] + offset]))
+            && right < (tmp = getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval)))// bptr[SA[leftInterval] + offset]))
+    {
         do
         {
-            long bptrOffset = getSeqNo(SA[leftInterval]) * bptrExtPerString;
+            unsigned bptrOffset = getSeqNo(SA[leftInterval]) * bptrExtPerString;
             // nextBptr[bptrOffset + posGlobalize(SA[leftInterval], limits)] =	rightInterval;
             appendValue(nextBptr,
                     Pair<TSize, TSize>(bptrOffset + posGlobalize(SA[leftInterval], limits), rightInterval));
@@ -785,7 +700,7 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
     while (left <= leftInterval && left <= getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval) //bptr[SA[leftInterval] + offset]
     && getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval) <= right)
     {
-        long bptrOffset = getSeqNo(SA[leftInterval]) * bptrExtPerString;
+        unsigned bptrOffset = getSeqNo(SA[leftInterval]) * bptrExtPerString;
         //nextBptr[bptrOffset + posGlobalize(SA[leftInterval], limits)] =	rightInterval;
         appendValue(nextBptr,
                 Pair<TSize, TSize>(bptrOffset + posGlobalize(SA[leftInterval], limits), rightInterval));
@@ -801,7 +716,7 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
         const TSize tmp2 = getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval); //bptr[SA[leftInterval] + offset];
         do
         {
-            long bptrOffset = getSeqNo(SA[leftInterval]) * bptrExtPerString;
+            unsigned bptrOffset = getSeqNo(SA[leftInterval]) * bptrExtPerString;
             //nextBptr[bptrOffset + posGlobalize(SA[leftInterval], limits)] =	rightInterval;
             appendValue(nextBptr,
                     Pair<TSize, TSize>(bptrOffset + posGlobalize(SA[leftInterval], limits), rightInterval));
@@ -828,7 +743,7 @@ unsigned int computeLCPAndOffset(TSa const & SA, TBptr const & bptr, TLimits con
     while (true)
     {
         TSize index = left;
-        long bptrOffset = getSeqNo(SA[right]) * bptrExtPerString;
+        unsigned bptrOffset = getSeqNo(SA[right]) * bptrExtPerString;
         TBptrVal tmp = bptr[bptrOffset + posGlobalize(SA[right], limits) + lcp];
         while (index < right)
         {
@@ -851,8 +766,8 @@ void sortSizeTwo(TSA &SA, TBptr const & bptr, TLimits const & limits, unsigned s
     typedef typename Value<TSA>::Type TSAVal;
 
     unsigned bptrExtPerString = (2 * d + 1);
-    long bptrOffset1 = getSeqNo(SA[left]) * bptrExtPerString;
-    long bptrOffset2 = getSeqNo(SA[right]) * bptrExtPerString;
+    unsigned bptrOffset1 = getSeqNo(SA[left]) * bptrExtPerString;
+    unsigned bptrOffset2 = getSeqNo(SA[right]) * bptrExtPerString;
 
     unsigned suffix1 = posGlobalize(SA[left], limits) + offset;
     unsigned suffix2 = posGlobalize(SA[right], limits) + offset;
@@ -878,8 +793,9 @@ template<typename TSA, typename TBptrVal, typename TLimits, typename TExtString,
 TBptrVal getBptrVal(TSA const & SA, String<TBptrVal> const & bptr, TLimits const & limits,
         TExtString const & bptrExtPerString, TOffset const & offset, TIndex const & index)
 {
-    const long bptrOffset = getSeqNo(SA[index]) * bptrExtPerString;
-    return bptr[posGlobalize(SA[index], limits) + offset + bptrOffset];
+//    const long bptrOffset = getSeqNo(SA[index]) * bptrExtPerString;
+//    return bptr[posGlobalize(SA[index], limits) + offset + bptrOffset];
+    return bptr[posGlobalize(SA[index], limits) + offset + getSeqNo(SA[index]) * bptrExtPerString];
 }
 
 }  // namespace seqan
