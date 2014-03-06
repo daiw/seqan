@@ -100,8 +100,6 @@ void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
 
     const TStringSetLimits limits = stringSetLimits(s);
 
-    //TODO: remove primitive types
-
 /////////////////////////
 // Phase 1:
 // sort suffixes with length d and create bucketPointer bptr
@@ -397,8 +395,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
     StringSet<String<Triple<TBktIndex, TBktIndex, unsigned> > > bucketIndicesSet;
     resize(bucketIndicesSet, omp_get_max_threads());
 
-    //Initial: Sequentially find non empty Buckets and store theire indices
-
+    //Initial: find non empty Buckets and store their indices
     SEQAN_OMP_PRAGMA(parallel)
     {
         String<Triple<TBktIndex, TBktIndex, unsigned> > &bucketIndicesCur = bucketIndicesSet[omp_get_thread_num()];
@@ -406,7 +403,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
         for (TAlpha i = 0; i < ALPHABETSIZE; ++i)
         {
             for (TAlpha j = 0; j < ALPHABETSIZE; ++j)
-            {            //Buckets starting with two same charactes get a special treatment at the end of this function
+            {
                 if (j == i)
                     continue;
                 //add 1 since we use 0 as the dollar-sign

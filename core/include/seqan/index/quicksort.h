@@ -168,7 +168,7 @@ void quickSort(const qsortSequential &tag, TSA &SA, TSortFunctor &sortFunctor, c
 
     TIndex leftTmp = _partition<TIndex>(SA, pivot, sortFunctor, left, right);
 
-    if (right - leftTmp > 1)
+    if (right > leftTmp + 1)
     {
         doQuickSort(tag, SA, sortFunctor, leftTmp + 1, right);
     }
@@ -177,7 +177,7 @@ void quickSort(const qsortSequential &tag, TSA &SA, TSortFunctor &sortFunctor, c
         --leftTmp;
     }
     while (leftTmp > left && sortFunctor(leftTmp) == pivot);
-    if (leftTmp - left > 0)
+    if (leftTmp > left)
     {
         doQuickSort(tag, SA, sortFunctor, left, leftTmp);
     }
@@ -201,26 +201,22 @@ void quickSort(const qsortParallel &tag, TSA &SA, TSortFunctor &sortFunctor, con
 
     TIndex leftTmp = _partition<TIndex>(SA, pivot, sortFunctor, left, right);
 
-    const TIndex leftTmpCopy = leftTmp;
-
-    SEQAN_OMP_PRAGMA(task shared(SA, tag, sortFunctor))
+    SEQAN_OMP_PRAGMA(task firstprivate(leftTmp, right, depth) shared(SA, tag, sortFunctor))
     {
-        if (right - leftTmp > 1)
+        if (right > leftTmp + 1)
         {
-            doQuickSort(tag, SA, sortFunctor, leftTmpCopy + 1, right, depth + 1);
+            doQuickSort(tag, SA, sortFunctor, leftTmp + 1, right, depth + 1);
         }
     }
-//	SEQAN_OMP_PRAGMA(task shared(SA, tag, sortFunctor)) {
     do
     {
         --leftTmp;
     }
     while (leftTmp > left && sortFunctor(leftTmp) == pivot);
-    if (leftTmp - left > 0)
+    if (leftTmp > left)
     {
         doQuickSort(tag, SA, sortFunctor, left, leftTmp, depth + 1);
     }
-//	}
 }
 
 template<typename TSA, typename TSortFunctor, typename TIndex>
