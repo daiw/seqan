@@ -172,6 +172,7 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
 {
     typedef typename SAValue<TText>::Type TSAValue;
     typedef typename Size<TText>::Type TTextSize;
+    typedef typename Value<TBkt>::Type TBktValue;
 
     const unsigned bptrExtPerString = (2 * d + 1);//after each sequence we insert 2*d+1 values to sort the $ correctly
 
@@ -233,28 +234,27 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
         SEQAN_OMP_PRAGMA(single)
         {
             bkt[0] = 0;
-            int last = 0;
-            int tmp;
-            for (unsigned i = 0; i < length(bktPerThread[0]); ++i)
+            TBktValue last = 0;
+            TBktValue tmp;
+            for (unsigned i = 0; i < length(bktPerThread[0]) - 1; ++i)
             {
-
-                //TODO: kommentieren, hier wird gleichzeit bkt und bktperTrhead kummuliert
-                int perThreadLast = 0;
-
-                int bktOffset = 1;
                 if (i == bucketCount)
-                bktOffset = 0;
-                //TODO: wofür brauche ich den bktOffset?
+                    continue;
 
-                bkt[i + bktOffset] = last;
+                //we fill the next bucketentry with the previous count, to have the bucket-startposition
+                bkt[i + 1] = last;
+
+                //We do the same per thread, so that each thread has its own startposition and we avoid locking
+                TBktValue perThreadLast = 0;
                 for (TSplitterSize j = 0; j < length(splitter); ++j)
                 {
-                    bkt[i + bktOffset] += bktPerThread[j][i];
                     tmp = bktPerThread[j][i];
                     bktPerThread[j][i] = perThreadLast;
                     perThreadLast += tmp;
                 }
-                last = bkt[i + bktOffset];
+                bkt[i + 1] += perThreadLast;
+
+                last = bkt[i + 1];
             }
             bkt[bucketCount] = n;
         }
@@ -395,36 +395,38 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
 
     //A String for each Thread containing Triple(startIndex, endIndex, offset)
     StringSet<String<Triple<TBktIndex, TBktIndex, unsigned> > > bucketIndicesSet;
-    resize(bucketIndicesSet, 1);
+    resize(bucketIndicesSet, omp_get_max_threads());
 
-    //TODO: parallelize both for-loops?
     //Initial: Sequentially find non empty Buckets and store theire indices
-    String<Triple<TBktIndex, TBktIndex, unsigned> > &bucketIndicesCur = bucketIndicesSet[0];
-    for (TAlpha i = 0; i < ALPHABETSIZE; ++i)
+
+    SEQAN_OMP_PRAGMA(parallel)
     {
-        //add 1 since we use 0 as the dollar-sign
-        const TAlpha firstChar = 1 + i;
-
-        for (TAlpha j = 0; j < ALPHABETSIZE; ++j)
+        String<Triple<TBktIndex, TBktIndex, unsigned> > &bucketIndicesCur = bucketIndicesSet[omp_get_thread_num()];
+        SEQAN_OMP_PRAGMA(for collapse(2) schedule(dynamic))
+        for (TAlpha i = 0; i < ALPHABETSIZE; ++i)
         {
-            //Buckets starting with two same charactes get a special treatment at the end of this function
-            if (j == i)
-                continue;
-            const TAlpha secondChar = 1 + j;
+            for (TAlpha j = 0; j < ALPHABETSIZE; ++j)
+            {            //Buckets starting with two same charactes get a special treatment at the end of this function
+                if (j == i)
+                    continue;
+                //add 1 since we use 0 as the dollar-sign
+                const TAlpha firstChar = 1 + i;
+                const TAlpha secondChar = 1 + j;
 
-            const long bktStartIndex = firstChar * bucketsInL1Bucket + secondChar * bucketsInL2Bucket; //startbucket for suffixes starting with firstchar, secondchar
-            const long bktEndIndex = bktStartIndex + bucketsInL2Bucket;
+                const long bktStartIndex = firstChar * bucketsInL1Bucket + secondChar * bucketsInL2Bucket; //startbucket for suffixes starting with firstchar, secondchar
+                const long bktEndIndex = bktStartIndex + bucketsInL2Bucket;
 
-            for (long k = bktStartIndex; k < bktEndIndex; ++k)
-            { //all buckets starting with firstchar, secondchar characters
-
-                const TBktIndex left = bkt[k]; //Start
-                const TBktIndex right = bkt[k + 1] - 1; //end: next bucket start -1
-
-                long bucketSize = right - left;
-                if (bucketSize > 0)
+                for (long k = bktStartIndex; k < bktEndIndex; ++k)
                 {
-                    appendValue(bucketIndicesCur, Triple<TBktIndex, TBktIndex, unsigned>(left, right, d));
+                    //all buckets starting with firstchar, secondchar
+                    const TBktIndex left = bkt[k]; //Start
+                    const TBktIndex right = bkt[k + 1] - 1; //end: next bucket start -1
+
+                    long bucketSize = right - left;
+                    if (bucketSize > 0)
+                    {
+                        appendValue(bucketIndicesCur, Triple<TBktIndex, TBktIndex, unsigned>(left, right, d));
+                    }
                 }
             }
         }
