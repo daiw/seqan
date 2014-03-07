@@ -473,7 +473,7 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
             const unsigned endBucketIndex = bucketInsertCount[bucketIndex];
             if (endBucketIndex > startBucketIndex)
                 //sorts the buckets section in pos
-                doQuickSort(qsortParallel(), pos, sortFunctor, startBucketIndex, endBucketIndex - 1);
+                doQuickSort(QsortParallel(), pos, sortFunctor, startBucketIndex, endBucketIndex - 1);
         }
 
         //Wait for Quicksort tasks to finish
