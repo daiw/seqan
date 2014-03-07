@@ -276,61 +276,8 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
         }
 #endif
 
-        //count characters per bucket for each position and store count-values in charCountBuffer
-        SEQAN_OMP_PRAGMA(for schedule(dynamic))
-        for (long bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
-        {
-            String<unsigned> &currentBuffer = charCountBuffer[bucketIndex];
-            String<BucketValueType> &currentBucket = bucket[bucketIndex];
-
-            const int oldbucketLength = charCountBufferSize[bucketIndex];
-            const int bucketLength = bucketVolume[bucketIndex];
-
-            if(oldbucketLength == bucketLength)
-            {
-                //this bucket did not change, no need to recount
-                continue;
-            }
-            charCountBufferSize[bucketIndex] = bucketLength;
-
-            //Get the first changed index since last iteration. We don't need to recount the previous values
-            const unsigned startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
-            const TValueSize &currentPos = pos[startBucketIndex].i2;
-
-            //Initially all counts are 0.
-            if (currentPos == 0)
-            {
-                for (unsigned j = 0; j < ALPHABETSIZE; ++j)
-                {
-                    currentBuffer[j] = 0;
-                }
-                BucketValueType &bktValue = currentBucket[0];
-                if (!bktValue.i3)
-                {
-                    ++currentBuffer[ordValue(bktValue.i2)];
-                }
-            }
-
-
-            for (int index = (currentPos==0 ? 1 : currentPos); index < bucketLength; ++index)
-            {
-                unsigned currentBufferStart = index * ALPHABETSIZE;
-                unsigned lastBufferStart = currentBufferStart - ALPHABETSIZE;
-
-                //First copy the values from previous entry
-                for (unsigned j = 0; j < ALPHABETSIZE; ++j)
-                {
-                    currentBuffer[currentBufferStart + j] = currentBuffer[lastBufferStart + j];
-                }
-
-                //Increment count for current character
-                BucketValueType &bktValue = currentBucket[index];
-                if (!bktValue.i3)
-                {
-                    ++currentBuffer[currentBufferStart + ordValue(bktValue.i2)];
-                }
-            }
-        }
+        countCharacters(bucketCount, charCountBuffer, bucket, charCountBufferSize,
+                bucketVolume, bucketInsertCount, pos,  ALPHABETSIZE);
 
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
         if(omp_get_thread_num()==0)
@@ -617,6 +564,76 @@ void preallocateMemory(TText const & text, TBucketCount const & bucketCount, TBu
     std::cout << " AllocTime:   " << omp_get_wtime() - beginAllocTime << std::endl;
 #endif
 }
+
+template<typename TBCount, typename TCharCountBuffer, typename TBucket, typename TCCBSize, typename TBVolume, typename TBInsertCount,
+typename TPos, typename TAlphabetSize>
+void countCharacters(TBCount const bucketCount, TCharCountBuffer & charCountBuffer, TBucket & bucket, TCCBSize & charCountBufferSize,
+        TBVolume & bucketVolume, TBInsertCount & bucketInsertCount, TPos & pos, TAlphabetSize const & alphabetSize)
+{
+    typedef typename Value<TBucket>::Type TBucketValue;
+    typedef typename Value<TBucketValue>::Type BucketValueType;
+    typedef typename Value<TPos>::Type TPosValue;
+    typedef typename Value<TPosValue, 2>::Type TValueSize;
+    typedef typename Value<TCharCountBuffer>::Type TCharCountBufferValue;
+    typedef typename Value<TCCBSize>::Type TCCBSizeValue;
+    typedef typename Value<TBVolume>::Type TBVolumeValue;
+
+    //count characters per bucket for each position and store count-values in charCountBuffer
+    SEQAN_OMP_PRAGMA(for schedule(dynamic))
+    for (TBCount bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
+    {
+       TCharCountBufferValue & currentBuffer = charCountBuffer[bucketIndex];
+       TBucketValue & currentBucket = bucket[bucketIndex];
+
+       TCCBSizeValue const oldbucketLength = charCountBufferSize[bucketIndex];
+       TBVolumeValue const bucketLength = bucketVolume[bucketIndex];
+
+       if(oldbucketLength == bucketLength)
+       {
+           //this bucket did not change, no need to recount
+           continue;
+       }
+       charCountBufferSize[bucketIndex] = bucketLength;
+
+       //Get the first changed index since last iteration. We don't need to recount the previous values
+       const unsigned startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
+       const TValueSize & currentPos = pos[startBucketIndex].i2;
+
+       //Initially all counts are 0.
+       if (currentPos == 0)
+       {
+           for (TAlphabetSize j = 0; j < alphabetSize; ++j)
+           {
+               currentBuffer[j] = 0;
+           }
+           BucketValueType & bktValue = currentBucket[0];
+           if (!bktValue.i3)
+           {
+               ++currentBuffer[ordValue(bktValue.i2)];
+           }
+       }
+
+       for (TBVolumeValue index = (currentPos==0 ? 1 : currentPos); index < bucketLength; ++index)
+       {
+           unsigned currentBufferStart = index * alphabetSize;
+           unsigned lastBufferStart = currentBufferStart - alphabetSize;
+
+           //First copy the values from previous entry
+           for (TAlphabetSize j = 0; j < alphabetSize; ++j)
+           {
+               currentBuffer[currentBufferStart + j] = currentBuffer[lastBufferStart + j];
+           }
+
+           //Increment count for current character
+           BucketValueType &bktValue = currentBucket[index];
+           if (!bktValue.i3)
+           {
+               ++currentBuffer[currentBufferStart + ordValue(bktValue.i2)];
+           }
+       }
+    }
+}
+
 
 /*
  * We have 'insertCount' new entrys in bucket. Sort them after with their position in .i1
