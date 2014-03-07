@@ -494,7 +494,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
                     {
                         typedef _bprComparator<TTextSize, TSA, TBptr, TLimit, TTextSize> TSortFunctor;
                         TSortFunctor sortFunctor = TSortFunctor(SA, bptr, limits, bptrExtPerString, offset);
-                        doQuickSort(qsortSequential(), SA, sortFunctor, start, end);
+                        doQuickSort(QsortSequential(), SA, sortFunctor, start, end);
                     }
                 }
 
