@@ -291,57 +291,8 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
         }
 #endif
 
-        //get insert positions for the next character in every input-text
-        //Do this in parallel for every bucket
-        SEQAN_OMP_PRAGMA(for schedule(guided))
-        for (unsigned bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
-        {
-            const unsigned startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
-            const unsigned endBucketIndex = bucketInsertCount[bucketIndex];
-
-            const String<BucketValueType> &currentBucket = bucket[bucketIndex];
-
-            //all positions corresponding to this Bucket
-            for (unsigned i = startBucketIndex; i < endBucketIndex; ++i)
-            {
-                if (bucketIndex != qIndex[i])
-                {
-                    //this happens only if the text ended in the previous iteration
-                    //It will be ignored in further iterations
-                    continue;
-                }
-
-                const TValueSize &currentPos = pos[i].i2;
-                const BucketValueType &bv = currentBucket[currentPos]; //in previous iteration inserted char
-                const unsigned charValue = ordValue(bv.i2);
-
-                //count occurences in every bucket until we reach current position
-                //(For bucketsize>0 it is sufficient to count only the buckets starting with the same character)
-                const long startBucket = bucketIndex - (bucketIndex % ALPHABETSIZEWITHDOLLAR);
-                long charCount = 0;
-                for (unsigned j = startBucket; j < bucketIndex; ++j)
-                {
-                    String<unsigned> &cur = charCountBuffer[j];
-                    const unsigned curBufferSize = charCountBufferSize[j];
-                    if (curBufferSize > 0)
-                    {
-                        charCount += cur[ALPHABETSIZE * (curBufferSize - 1) + charValue];
-                    }
-                }
-                if (currentPos > 0)
-                {
-                    charCount += charCountBuffer[bucketIndex][ALPHABETSIZE * (currentPos - 1) + charValue];
-                }
-
-                //remove last char of bucket (shift position (division)) and append new char in front (pow)
-                const long newBucketIndex = (startBucket / ALPHABETSIZEWITHDOLLAR)
-                        + (powAlphabetBucketSize * (1 + charValue));//1+ to ignore the firstBucket
-
-                pos[i].i2 = charCount;
-                tempQIndex[i] = newBucketIndex;
-                ++threadBktInsertCount[newBucketIndex];
-            }
-        }
+        getInsertPositions(bucketCount, charCountBuffer, bucket, charCountBufferSize,
+                qIndex, tempQIndex, bucketInsertCount, pos, threadBktInsertCount, ALPHABETSIZE, powAlphabetBucketSize);
 
         //accumulate bucket insert count of every thread
         SEQAN_OMP_PRAGMA(for)
@@ -577,6 +528,7 @@ void countCharacters(TBCount const bucketCount, TCharCountBuffer & charCountBuff
     typedef typename Value<TCharCountBuffer>::Type TCharCountBufferValue;
     typedef typename Value<TCCBSize>::Type TCCBSizeValue;
     typedef typename Value<TBVolume>::Type TBVolumeValue;
+    typedef typename Value<TBInsertCount>::Type TBInsertCountValue;
 
     //count characters per bucket for each position and store count-values in charCountBuffer
     SEQAN_OMP_PRAGMA(for schedule(dynamic))
@@ -596,8 +548,8 @@ void countCharacters(TBCount const bucketCount, TCharCountBuffer & charCountBuff
        charCountBufferSize[bucketIndex] = bucketLength;
 
        //Get the first changed index since last iteration. We don't need to recount the previous values
-       const unsigned startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
-       const TValueSize & currentPos = pos[startBucketIndex].i2;
+       TBInsertCountValue const startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
+       TValueSize const & currentPos = pos[startBucketIndex].i2;
 
        //Initially all counts are 0.
        if (currentPos == 0)
@@ -634,6 +586,74 @@ void countCharacters(TBCount const bucketCount, TCharCountBuffer & charCountBuff
     }
 }
 
+template<typename TBCount, typename TCharCountBuffer, typename TBucket, typename TCCBSize, typename TQindex, typename TBInsertCount,
+typename TPos, typename TAlphabetSize, typename TPowValue>
+void getInsertPositions(TBCount const bucketCount, TCharCountBuffer & charCountBuffer, TBucket & bucket, TCCBSize & charCountBufferSize,
+        TQindex & qIndex, TQindex & tempQIndex, TBInsertCount & bucketInsertCount, TPos & pos, TBInsertCount & threadBktInsertCount, TAlphabetSize const & alphabetSize, TPowValue const & powAlphabetBucketSize)
+{
+    typedef typename Value<TBInsertCount>::Type TBInsertCountValue;
+    typedef typename Value<TBucket>::Type TBucketValue;
+    typedef typename Value<TBucketValue>::Type BucketValueType;
+    typedef typename Value<TPos>::Type TPosValue;
+    typedef typename Value<TPosValue, 2>::Type TValueSize;
+    typedef typename Value<TCharCountBuffer>::Type TCharCountBufferValue;
+    typedef typename Value<TCCBSize>::Type TCCBSizeValue;
+    typedef typename Value<TQindex>::Type TQindexValue;
+
+    TAlphabetSize const & alphabetSizeQithDollar = alphabetSize + 1;
+
+    //get insert positions for the next character in every input-text
+    //Do this in parallel for every bucket
+    SEQAN_OMP_PRAGMA(for schedule(guided))
+    for (TBCount bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
+    {
+        TBInsertCountValue const startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
+        TBInsertCountValue const endBucketIndex = bucketInsertCount[bucketIndex];
+
+        String<BucketValueType> const & currentBucket = bucket[bucketIndex];
+
+        //all positions corresponding to this Bucket
+        for (TBInsertCountValue i = startBucketIndex; i < endBucketIndex; ++i)
+        {
+            if (bucketIndex != qIndex[i])
+            {
+                //this happens only if the text ended in the previous iteration
+                //It will be ignored in further iterations
+                continue;
+            }
+
+            TValueSize const & currentPos = pos[i].i2;
+            BucketValueType const & bv = currentBucket[currentPos]; //in previous iteration inserted char
+            unsigned const charValue = ordValue(bv.i2);
+
+            //count occurences in every bucket until we reach current position
+            //(For bucketsize>0 it is sufficient to count only the buckets starting with the same character)
+            TBCount const startBucket = bucketIndex - (bucketIndex % alphabetSizeQithDollar);
+            unsigned charCount = 0;
+            for (TBCount j = startBucket; j < bucketIndex; ++j)
+            {
+                TCharCountBufferValue &cur = charCountBuffer[j];
+                TCCBSizeValue const curBufferSize = charCountBufferSize[j];
+                if (curBufferSize > 0)
+                {
+                    charCount += cur[alphabetSize * (curBufferSize - 1) + charValue];
+                }
+            }
+            if (currentPos > 0)
+            {
+                charCount += charCountBuffer[bucketIndex][alphabetSize * (currentPos - 1) + charValue];
+            }
+
+            //remove last char of bucket (shift position (division)) and append new char in front (pow)
+            TQindexValue const newBucketIndex = (startBucket / alphabetSizeQithDollar)
+                    + (powAlphabetBucketSize * (1 + charValue));//1+ to ignore the firstBucket
+
+            pos[i].i2 = charCount;
+            tempQIndex[i] = newBucketIndex;
+            ++threadBktInsertCount[newBucketIndex];
+        }
+    }
+}
 
 /*
  * We have 'insertCount' new entrys in bucket. Sort them after with their position in .i1
