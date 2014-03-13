@@ -390,46 +390,7 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
         }
 #endif
 
-        //Now insert the new characters into the buckets, in parallel for each bucket
-        SEQAN_OMP_PRAGMA(for schedule(guided))
-        for (long bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
-        {
-            const unsigned startBucketIndex = bucketIndex == 0 ?
-                    0 : bucketInsertCount[bucketIndex - 1];
-            const unsigned endBucketIndex = bucketInsertCount[bucketIndex];
-
-            String<BucketValueType> &currentBuffer = buffer[bucketIndex];
-            String<BucketValueType> &currentBucket = bucket[bucketIndex];
-            unsigned &currentBucketVolume = bucketVolume[bucketIndex];
-
-            for (unsigned i = startBucketIndex; i < endBucketIndex; ++i)
-            {
-                const TText& currentText = text[pos[i].i1];
-                const bool isLastCharOfText = iteration == length(currentText);
-
-                //replace with sentinelSub
-                const TAlphabet newChar = (isLastCharOfText) ? sentinelSub :
-                        currentText[length(currentText) - (int) iteration - 1];
-
-                //Insert new values into the buffer. This avoids many move operations within the array
-                BucketValueType &cur = currentBuffer[i - startBucketIndex];
-
-                cur.i1 = pos[i].i2;
-                cur.i2 = newChar;
-                cur.i3 = isLastCharOfText;
-
-                if (isLastCharOfText)
-                {
-                    //invalidate to ignore this input-text index in next iterations
-                    qIndex[i] = bucketCount;
-                    tempQIndex[i] = bucketCount;
-                }
-            }
-
-            //now sort the new values from buffer to the correct positions
-            sortBwtBucket(currentBucket, currentBucketVolume, currentBuffer, endBucketIndex - startBucketIndex);
-            currentBucketVolume += endBucketIndex - startBucketIndex;
-        }
+        insertIntoBuckets(iteration, bucketCount, sentinelSub, text, bucket, qIndex, tempQIndex, bucketInsertCount, pos, buffer, bucketVolume);
 
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
         if(omp_get_thread_num()==0)
@@ -652,6 +613,60 @@ void getInsertPositions(TBCount const bucketCount, TCharCountBuffer & charCountB
             tempQIndex[i] = newBucketIndex;
             ++threadBktInsertCount[newBucketIndex];
         }
+    }
+}
+
+
+template<typename TIteration, typename TBCount, typename TAlphabet, typename TTexts, typename TBucket, typename TQindex, typename TInsertCount,
+typename TPos, typename TBuffer, typename TBktVolume>
+void insertIntoBuckets(TIteration const iteration, TBCount const bucketCount, TAlphabet const & sentinelSub, TTexts & text, TBucket & bucket,
+        TQindex & qIndex, TQindex & tempQIndex, TInsertCount & bucketInsertCount, TPos & pos, TBuffer & buffer, TBktVolume & bucketVolume)
+{
+    typedef typename Value<TInsertCount>::Type TInsertCountValue;
+    typedef typename Value<TBucket>::Type TBucketValue;
+    typedef typename Value<TBucketValue>::Type BucketValueType;
+    typedef typename Value<TBktVolume>::Type TBktVolumeValue;
+    typedef typename Value<TTexts>::Type TText;
+
+    //Now insert the new characters into the buckets, in parallel for each bucket
+    SEQAN_OMP_PRAGMA(for schedule(guided))
+    for (TBCount bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
+    {
+       TInsertCountValue const startBucketIndex = bucketIndex == 0 ?
+               0 : bucketInsertCount[bucketIndex - 1];
+       TInsertCountValue const endBucketIndex = bucketInsertCount[bucketIndex];
+
+       String<BucketValueType> & currentBuffer = buffer[bucketIndex];
+       String<BucketValueType> & currentBucket = bucket[bucketIndex];
+       TBktVolumeValue & currentBucketVolume = bucketVolume[bucketIndex];
+
+       for (TInsertCountValue i = startBucketIndex; i < endBucketIndex; ++i)
+       {
+           TText const & currentText = text[pos[i].i1];
+           bool const isLastCharOfText = iteration == length(currentText);
+
+           //replace with sentinelSub
+           TAlphabet const newChar = (isLastCharOfText) ? sentinelSub :
+                   currentText[length(currentText) - (int) iteration - 1]; //TODO cast nach int?
+
+           //Insert new values into the buffer. This avoids many move operations within the array
+           BucketValueType & cur = currentBuffer[i - startBucketIndex];
+
+           cur.i1 = pos[i].i2;
+           cur.i2 = newChar;
+           cur.i3 = isLastCharOfText;
+
+           if (isLastCharOfText)
+           {
+               //invalidate to ignore this input-text index in next iterations
+               qIndex[i] = bucketCount;
+               tempQIndex[i] = bucketCount;
+           }
+       }
+
+       //now sort the new values from buffer to the correct positions
+       sortBwtBucket(currentBucket, currentBucketVolume, currentBuffer, endBucketIndex - startBucketIndex);
+       currentBucketVolume += endBucketIndex - startBucketIndex;
     }
 }
 
