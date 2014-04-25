@@ -150,19 +150,17 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
     // 1: index for sorting the entries (should match index in String)
     // 2: the character in the BWT
     // 3: true, if the character is a sentinel
-    typedef Triple<unsigned, TAlphabet, bool> BucketValueType;
-
-    //TODO: replace short/int/long by Size<>::Type / Value<>...
+    typedef Triple<TValueSize, TAlphabet, bool> BucketValueType;
 
     String<String<BucketValueType> > bucket;
     resize(bucket, bucketCount, Exact());
-    String<unsigned> bucketVolume; //current size of each bucket (since we allocate all memory at once, we can not use the string-length for this)
+    String<TValueSize> bucketVolume; //current size of each bucket (since we allocate all memory at once, we can not use the string-length for this)
     resize(bucketVolume, bucketCount, 0);
 
     // for each bucket: string with length count * alphabetsize which contains for each position the count of each character up to this position
-    String<String<unsigned> > charCountBuffer;
+    String<String<TValueSize> > charCountBuffer;
     resize(charCountBuffer, bucketCount);
-    String<unsigned> charCountBufferSize; //current buffer size
+    String<TValueSize> charCountBufferSize; //current buffer size
     resize(charCountBufferSize, bucketCount, 0);
 
     //Allocate the bucketmemory here, to avoid append and resize operations in parallel sections
@@ -182,7 +180,7 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
     resize(tempQIndex, count, Exact());
 
     //number of inserts in last iteration for each Bucket
-    String<unsigned> bucketInsertCount;
+    String<TValueSize> bucketInsertCount;
     resize(bucketInsertCount, bucketCount, 0, Exact());
 
     /*
@@ -240,13 +238,13 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
 #endif
 
     //Store Insertcount per thread to avoid locking
-    String<String<unsigned> > tempBucketInsertCount;
+    String<String<TValueSize> > tempBucketInsertCount;
     resize(tempBucketInsertCount, omp_get_max_threads(), Exact());
-    for (unsigned int i = 0; i < length(tempBucketInsertCount); ++i)
+    typedef typename Size<String<String<TValueSize> > >::Type TBktInsertSize;
+    for (TBktInsertSize i = 0; i < length(tempBucketInsertCount); ++i)
     {
         resize(tempBucketInsertCount[i], bucketCount, Exact());
     }
-    typedef typename Size<String<String<unsigned> > >::Type TBktInsertSize;
 
     String<String<BucketValueType> > buffer;//Buffer is needed for efficiently inserting multiple new values into the buckets
     resize(buffer, bucketCount, Exact());
@@ -262,7 +260,7 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
 
     SEQAN_OMP_PRAGMA(parallel shared(text, bucket, bucketVolume, charCountBuffer, charCountBufferSize, tempBucketInsertCount, bucketInsertCount, pos, qIndex, tempQIndex, buffer))
     {
-        String<unsigned> &threadBktInsertCount = tempBucketInsertCount[omp_get_thread_num()];
+        String<TValueSize> &threadBktInsertCount = tempBucketInsertCount[omp_get_thread_num()];
 
         //reset bucketInsertCounter (each thread resets its own counter)
         for (unsigned bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
@@ -282,8 +280,8 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
         SEQAN_OMP_PRAGMA(for schedule(dynamic))
         for (unsigned bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
         {
-            unsigned const bucketLength = bucketVolume[bucketIndex];
-            unsigned const oldbucketLength = charCountBufferSize[bucketIndex];
+            TValueSize const bucketLength = bucketVolume[bucketIndex];
+            TValueSize const oldbucketLength = charCountBufferSize[bucketIndex];
 
             if(oldbucketLength == bucketLength)
             {
@@ -313,8 +311,8 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
         SEQAN_OMP_PRAGMA(for schedule(guided))
         for (unsigned bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
         {
-            unsigned const startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
-            unsigned const endBucketIndex = bucketInsertCount[bucketIndex];
+            TValueSize const startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
+            TValueSize const endBucketIndex = bucketInsertCount[bucketIndex];
             if (endBucketIndex > startBucketIndex)
                 getInsertPositions(startBucketIndex, endBucketIndex, bucketIndex, charCountBuffer, bucket[bucketIndex], charCountBufferSize,
                         qIndex, tempQIndex, pos, threadBktInsertCount, ALPHABETSIZE, powAlphabetBucketSize);
@@ -334,7 +332,7 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
         SEQAN_OMP_PRAGMA(single)
         {
             bucketInsertCount[0] = tempBucketInsertCount[0][0];
-            for (unsigned bucketIndex = 1; bucketIndex < bucketCount; ++bucketIndex)
+            for (TValueSize bucketIndex = 1; bucketIndex < bucketCount; ++bucketIndex)
             {
                 bucketInsertCount[bucketIndex] = bucketInsertCount[bucketIndex - 1] + tempBucketInsertCount[0][bucketIndex];
             }
@@ -353,12 +351,12 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
 #endif
 
         //resize Buffer, to avoid resize in parallel section
-        SEQAN_OMP_PRAGMA(single nowait )
+        SEQAN_OMP_PRAGMA(single nowait)
         {
-            for (long bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
+            for (unsigned bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
             {
-                const unsigned startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
-                const unsigned endBucketIndex = bucketInsertCount[bucketIndex];
+                TValueSize const startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
+                TValueSize const endBucketIndex = bucketInsertCount[bucketIndex];
                 resize(buffer[bucketIndex], endBucketIndex - startBucketIndex);
             }
         }
@@ -367,7 +365,7 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
         SEQAN_OMP_PRAGMA(single nowait)
         {
             swap(qIndex, tempQIndex);
-            quickSort(qIndex, tempQIndex, pos, 0UL, length(qIndex) - 1, 0);
+            quickSort(qIndex, tempQIndex, pos, (TValueSize)0, (TValueSize)(length(qIndex) - 1), 0);
         }
 
         //Wait for parallel Quicksort tasks to finish
@@ -387,11 +385,11 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
 
         //We need to insert the new values per Bucket in ascending order.
         SEQAN_OMP_PRAGMA(for nowait)
-        for (long bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
+        for (unsigned bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
         {
             //get new position in ascending order
-            const unsigned startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
-            const unsigned endBucketIndex = bucketInsertCount[bucketIndex];
+            TValueSize const startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
+            TValueSize const endBucketIndex = bucketInsertCount[bucketIndex];
             if (endBucketIndex > startBucketIndex)
                 //sorts the buckets section in pos
                 doQuickSort(QsortParallel(), pos, sortFunctor, startBucketIndex, endBucketIndex - 1);
@@ -417,8 +415,8 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
         SEQAN_OMP_PRAGMA(for schedule(guided))
         for (unsigned bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
         {
-            unsigned const startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
-            unsigned const endBucketIndex = bucketInsertCount[bucketIndex];
+            TValueSize const startBucketIndex = bucketIndex == 0 ? 0 : bucketInsertCount[bucketIndex - 1];
+            TValueSize const endBucketIndex = bucketInsertCount[bucketIndex];
             if(startBucketIndex < endBucketIndex)
                 insertIntoBuckets(startBucketIndex, endBucketIndex, iteration, bucketCount, sentinelSub, text, bucket[bucketIndex], qIndex, tempQIndex, pos, buffer[bucketIndex], bucketVolume[bucketIndex]);
         }
@@ -442,12 +440,12 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
 #endif
 
     //write all values to the output-string
-    int index = 0;
-    int sentinelIndex = 0;
-    for (long bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
+    TValueSize index = 0;
+    TValueSize sentinelIndex = 0;
+    for (unsigned bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
     {
         String<BucketValueType> &currentBucket = bucket[bucketIndex];
-        for (unsigned j = 0; j < length(currentBucket); ++j)
+        for (TValueSize j = 0; j < length(currentBucket); ++j)
         {
             BucketValueType &bv = currentBucket[j];
             if (bv.i3)
@@ -472,7 +470,7 @@ inline void preallocateMemory(TText const & text, TBucketCount const & bucketCou
     double beginAllocTime = omp_get_wtime();
 #endif
 
-    String<unsigned> bucketCapacity;
+    String<TValueSize> bucketCapacity;
     resize(bucketCapacity, bucketCount, 0);
 
     //Compute Bucketsize in parallel
@@ -511,7 +509,7 @@ inline void preallocateMemory(TText const & text, TBucketCount const & bucketCou
 template<typename TBktIndex, typename TCharCountBuffer, typename TBucket, typename TBktLength, typename TBInsertCount,
 typename TPos, typename TAlphabetSize>
 inline void countCharacters(TBktIndex const bucketIndex, TCharCountBuffer & charCountBuffer, TBucket & currentBucket,
-        TBktLength const bucketLength, TBInsertCount & bucketInsertCount, TPos & pos, TAlphabetSize const & alphabetSize)
+        TBktLength const & bucketLength, TBInsertCount & bucketInsertCount, TPos & pos, TAlphabetSize const & alphabetSize)
 {
     typedef typename Value<TBucket>::Type BucketValueType;
     typedef typename Value<TPos>::Type TPosValue;
@@ -529,26 +527,34 @@ inline void countCharacters(TBktIndex const bucketIndex, TCharCountBuffer & char
         {
             charCountBuffer[j] = 0;
         }
-        BucketValueType & bktValue = currentBucket[0];
+        BucketValueType const & bktValue = currentBucket[0];
         if (!bktValue.i3)
         {
             ++charCountBuffer[ordValue(bktValue.i2)];
         }
     }
 
-    for (TBktLength index = (currentPos==0 ? 1 : currentPos); index < bucketLength; ++index)
+
+    //iterate over each entry in the bucket, starting at the first changed position
+    for (TBktLength index = (currentPos == 0 ? 1 : currentPos); index < bucketLength; ++index)
     {
-        unsigned currentBufferStart = index * alphabetSize;
-        unsigned lastBufferStart = currentBufferStart - alphabetSize;
+        TValueSize currentBufferStart = index * alphabetSize;
+        TValueSize lastBufferStart = currentBufferStart - alphabetSize;
+
+        typename Iterator<TCharCountBuffer >::Type itCur = iter(charCountBuffer, currentBufferStart);
+        typename Iterator<TCharCountBuffer >::Type itLast = iter(charCountBuffer, lastBufferStart);
 
         //First copy the values from previous entry
         for (TAlphabetSize j = 0; j < alphabetSize; ++j)
         {
-            charCountBuffer[currentBufferStart + j] = charCountBuffer[lastBufferStart + j];
+            assignValue(itCur, getValue(itLast));
+            goNext(itCur);
+            goNext(itLast);
+            //charCountBuffer[currentBufferStart + j] = charCountBuffer[lastBufferStart + j];
         }
 
         //Increment count for current character
-        BucketValueType &bktValue = currentBucket[index];
+        BucketValueType const & bktValue = currentBucket[index];
         if (!bktValue.i3)
         {
             ++charCountBuffer[currentBufferStart + ordValue(bktValue.i2)];
@@ -556,22 +562,24 @@ inline void countCharacters(TBktIndex const bucketIndex, TCharCountBuffer & char
     }
 }
 
-template<typename TBktIndex, typename TCharCountBuffer, typename TBucket, typename TCCBSize, typename TQindex, typename TBInsertCount,
+//For each character inserted into this bucket in the last iteration search the insertposition for the next character of the text
+//first count the occurences of the inserted character, which leads to the insertpositions inside the new bucket
+//then compute the new bucketindex to insert into
+template<typename TBktSize, typename TBktIndex, typename TCharCountBuffer, typename TBucket, typename TCCBSize, typename TQindex, typename TBInsertCount,
 typename TPos, typename TAlphabetSize, typename TPowValue>
-inline void getInsertPositions(TBktIndex const startBucketIndex, TBktIndex const endBucketIndex, TBktIndex const bucketIndex, TCharCountBuffer & charCountBuffer, TBucket & currentBucket, TCCBSize & charCountBufferSize,
+inline void getInsertPositions(TBktSize const startBucketIndex, TBktSize const endBucketIndex, TBktIndex const bucketIndex, TCharCountBuffer & charCountBuffer, TBucket & currentBucket, TCCBSize & charCountBufferSize,
         TQindex & qIndex, TQindex & tempQIndex, TPos & pos, TBInsertCount & threadBktInsertCount, TAlphabetSize const & alphabetSize, TPowValue const & powAlphabetBucketSize)
 {
     typedef typename Value<TBucket>::Type BucketValueType;
     typedef typename Value<TPos>::Type TPosValue;
     typedef typename Value<TPosValue, 2>::Type TValueSize;
-    typedef typename Value<TCharCountBuffer>::Type TCharCountBufferValue;
     typedef typename Value<TCCBSize>::Type TCCBSizeValue;
     typedef typename Value<TQindex>::Type TQindexValue;
 
     TAlphabetSize const & alphabetSizeQithDollar = alphabetSize + 1;
 
     //all positions corresponding to this Bucket
-    for (TBktIndex i = startBucketIndex; i < endBucketIndex; ++i)
+    for (TBktSize i = startBucketIndex; i < endBucketIndex; ++i)
     {
         if (bucketIndex != qIndex[i])
         {
@@ -590,11 +598,10 @@ inline void getInsertPositions(TBktIndex const startBucketIndex, TBktIndex const
         TValueSize charCount = 0;
         for (TBktIndex j = startBucket; j < bucketIndex; ++j)
         {
-            TCharCountBufferValue &cur = charCountBuffer[j];
             TCCBSizeValue const curBufferSize = charCountBufferSize[j];
             if (curBufferSize > 0)
             {
-                charCount += cur[alphabetSize * (curBufferSize - 1) + charValue];
+                charCount += charCountBuffer[j][alphabetSize * (curBufferSize - 1) + charValue];
             }
         }
         if (currentPos > 0)
@@ -612,25 +619,26 @@ inline void getInsertPositions(TBktIndex const startBucketIndex, TBktIndex const
     }
 }
 
-
-template<typename TBktIndex, typename TIteration, typename TBktCount, typename TAlphabet, typename TTexts, typename TBucket, typename TQindex,
-typename TPos, typename TBktVolume>
-inline void insertIntoBuckets(TBktIndex const startBucketIndex, TBktIndex const endBucketIndex, TIteration const iteration, TBktCount const bucketCount,
+//Insert all previously found characters into this bucket
+//first read the character from text, then add the new value to buffer
+//after that merge buffer into bucket
+template<typename TBktSize, typename TIteration, typename TBktCount, typename TAlphabet, typename TTexts, typename TBucket, typename TQindex,
+typename TPos>
+inline void insertIntoBuckets(TBktSize const startBucketIndex, TBktSize const endBucketIndex, TIteration const iteration, TBktCount const bucketCount,
         TAlphabet const & sentinelSub, TTexts & text, TBucket & currentBucket,
-        TQindex & qIndex, TQindex & tempQIndex, TPos & pos, TBucket & currentBuffer, TBktVolume & currentBucketVolume)
+        TQindex & qIndex, TQindex & tempQIndex, TPos & pos, TBucket & currentBuffer, TBktSize & currentBucketVolume)
 {
     typedef typename Value<TBucket>::Type BucketValueType;
     typedef typename Value<TTexts>::Type TText;
-    typedef typename Value<TBktVolume>::Type TBktVolumeValue;
 
-    for (TBktIndex i = startBucketIndex; i < endBucketIndex; ++i)
+    for (TBktSize i = startBucketIndex; i < endBucketIndex; ++i)
     {
        TText const & currentText = text[pos[i].i1];
        bool const isLastCharOfText = iteration == length(currentText);
 
        //replace with sentinelSub
        TAlphabet const newChar = (isLastCharOfText) ? sentinelSub :
-               currentText[length(currentText) - iteration - 1]; //TODO cast nach int?
+               currentText[length(currentText) - iteration - 1];
 
        //Insert new values into the buffer. This avoids many move operations within the array
        BucketValueType & cur = currentBuffer[i - startBucketIndex];
@@ -653,20 +661,20 @@ inline void insertIntoBuckets(TBktIndex const startBucketIndex, TBktIndex const 
 }
 
 /*
- * We have 'insertCount' new entrys in bucket. Sort them after with their position in .i1
+ * We have 'bufferVolume' new entrys in buffer. Merge them into bucket, so that the sortkeys in value.i1 are ascending.
  */
-template<typename BucketValueType>
-void sortBwtBucket(String<BucketValueType> & bucket, unsigned const & bucketVolume,
-        String<BucketValueType> const & buffer, unsigned const & bufferVolume)
+template<typename BucketValueType, typename TVolume>
+void sortBwtBucket(String<BucketValueType> & bucket, TVolume const & bucketVolume,
+        String<BucketValueType> const & buffer, TVolume const & bufferVolume)
 {
     if (bufferVolume == 0)
         return;
 
-    unsigned insertCount = 0;
+    TVolume insertCount = 0;
 
-    int curBucketIndex = bucketVolume - 1;
-    int curBufferIndex = bufferVolume - 1;
-    int curWriteIndex = bucketVolume + bufferVolume - 1;
+    long int curBucketIndex = bucketVolume - 1; //has to be signed value
+    TVolume curBufferIndex = bufferVolume - 1;
+    TVolume curWriteIndex = bucketVolume + bufferVolume - 1;
 
     //do a kind of merge sort to insert buffer into bucket, starting with the last values
     while (bufferVolume > insertCount)
@@ -677,7 +685,7 @@ void sortBwtBucket(String<BucketValueType> & bucket, unsigned const & bucketVolu
         {
             BucketValueType &curBuk = bucket[curBucketIndex];
 
-            if ((int) (curBuf.i1 - curBufferIndex) <= (int) curBuk.i1)
+            if ((int) (curBuf.i1 - curBufferIndex) <= (int) curBuk.i1) //signed comparison is needed
             {
                 //write bucket value
                 bucket[curWriteIndex] = curBuk;
@@ -743,9 +751,9 @@ inline void insertionSort(String<TAlphabet> & qIndex, String<TFoo1> & qIndexTemp
 
 //do quicksort sort for qIndex, move values from qIndexTemp and pos accordingly
 //create tasks until recursion is too deep. If length gets shorter than 15 use insertionSort instead
-template<typename TAlphabet, typename TFoo1, typename TFoo2, typename TIndex>
+template<typename TAlphabet, typename TFoo1, typename TFoo2, typename TIndex, typename TDepth>
 void quickSort(String<TAlphabet> & qIndex, String<TFoo1> & qIndexTemp, String<TFoo2> & pos, TIndex const left,
-        TIndex const right, long const depth)
+        TIndex const right, TDepth const depth)
 {
     if (right - left < 15)
     {

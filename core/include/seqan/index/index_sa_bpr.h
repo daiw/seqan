@@ -49,6 +49,9 @@ namespace seqan
 struct Bpr_;
 typedef Tag<Bpr_> Bpr;
 
+// comparator used for storting
+// for a given index it returns the BucketPointerValue for the suffixArray entry,
+// while respecting the offsets within StringSets
 template<typename InType, typename TSa, typename TBptr, typename TLimits, typename TOffset,
         typename OutType = typename Value<TBptr>::Type>
 struct _bprComparator : public std::unary_function<InType, OutType>
@@ -73,10 +76,6 @@ struct _bprComparator : public std::unary_function<InType, OutType>
 
 // ============================================================================
 // Metafunctions
-// ============================================================================
-
-// ============================================================================
-// Functions
 // ============================================================================
 
 /**
@@ -109,7 +108,7 @@ void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
     String<TTextSize> bkt; //set contains the count of the alphabetsize^d buckets
 
     //contains for each entry in text, the index of the last entry of the corresponding Bucket in SA
-    //remark: contains negative values to get the correct order of the $signs
+    //remark: contains negative values to get the correct order of the $-signs
     String<long> bptr;
 
 #if (SEQAN_ENABLE_DEBUG || SEQAN_ENABLE_TESTING) && SEQAN_ENABLE_PARALLELISM
@@ -145,19 +144,25 @@ void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
 
 }
 
+/**
+.Function.getAlphabetSize:
+..summary:returns the Alphabetsize of the String
+*/
 template<typename TString>
 unsigned getAlphabetSize(TString const &){
     typedef typename Value<TString>::Type ARGH;
     return ValueSize<ARGH>::VALUE;
 }
 
-
+/**
+.Function.getAlphabetSize:
+..summary:returns the Alphabetsize of the inner String
+*/
 template<typename TString>
 unsigned getAlphabetSize(StringSet<TString> const &){
     typedef typename Value<TString>::Type ARGH;
     return ValueSize<ARGH>::VALUE;
 }
-
 
 /*
  * sort suffixes with length d and create Bucketpointer
@@ -169,35 +174,42 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
         const TAlpha alphabeSizeWithDollar)
 {
     typedef typename SAValue<TText>::Type TSAValue;
-    typedef typename Size<TText>::Type TTextSize;
+    typedef typename LengthSum<TText>::Type TTextSize;
+    typedef typename Size<TText>::Type TTextCount;
     typedef typename Value<TBkt>::Type TBktValue;
+    typedef typename Size<TBkt>::Type TBktSize;
+    typedef typename Size<Splitter<TTextSize> >::Type TSplitterSize;
 
-    const unsigned bptrExtPerString = (2 * d + 1);//after each sequence we insert 2*d+1 values to sort the $ correctly
+    unsigned const bptrExtPerString = (2 * d + 1);//after each sequence we insert 2*d+1 values to sort the $ correctly
 
-    const long tmpModulo = pow(alphabeSizeWithDollar, (d - 1));
-    const long bucketCount = tmpModulo * alphabeSizeWithDollar;
+    //precompute some values:
+    unsigned const tmpModulo = pow(alphabeSizeWithDollar, (d - 1));
+    unsigned const bucketCount = tmpModulo * alphabeSizeWithDollar;
 
-    const TTextSize n = lengthSum(s);
-    const TTextSize stringCount = countSequences(s);
+    TTextSize const n = lengthSum(s);
+    TTextCount const stringCount = countSequences(s);
 
+    //bptr has the size of n plus an offset for each string in a stringSet
     resize(bptr, n + stringCount * bptrExtPerString, Exact());
     resize(bkt, bucketCount + 1, Exact());
 
+    //Splitt inputlength to equal parts per thread
     Splitter<TTextSize> splitter(0, n);
-    typedef typename Size<Splitter<TTextSize> >::Type TSplitterSize;
 
+    //each thread gets his own
     String<TBkt> bktPerThread;
     resize(bktPerThread, length(splitter), Exact());
 
     //parallel: Split text in parts of equal size for each thread
     SEQAN_OMP_PRAGMA(parallel num_threads(length(splitter)))
     {
-        const unsigned threadNum = omp_get_thread_num();
-        const TTextSize start = splitter[threadNum];
-        const TTextSize end = splitter[threadNum + 1];
+        unsigned const threadNum = omp_get_thread_num();
+        TTextSize const start = splitter[threadNum];
+        TTextSize const end = splitter[threadNum + 1];
         TSAValue saValue;
         long bptrOffset;
 
+        //init Bucket per Thread
         TBkt &threadBucket = bktPerThread[threadNum];
         resize(threadBucket, bucketCount + 1, 0, Exact());
 
@@ -205,7 +217,7 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
         posLocalize(saValue, start, limits);
         bptrOffset = getSeqNo(saValue) * bptrExtPerString;
 
-        long codeD = code_d(
+        unsigned codeD = code_d(
                 getSequenceByNo(getSeqNo(saValue), s), d, saValue,
                 alphabeSizeWithDollar);
         bptr[start + bptrOffset] = codeD;
@@ -234,7 +246,7 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
             bkt[0] = 0;
             TBktValue last = 0;
             TBktValue tmp;
-            for (unsigned i = 0; i < length(bktPerThread[0]) - 1; ++i)
+            for (TBktSize i = 0; i < length(bktPerThread[0]) - 1; ++i)
             {
                 if (i == bucketCount)
                     continue;
@@ -262,7 +274,7 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
         {
             posLocalize(saValue, i, limits);
             bptrOffset = getSeqNo(saValue) * bptrExtPerString;
-            long index = (bkt[bptr[i + bptrOffset] + 1]
+            TBktValue index = (bkt[bptr[i + bptrOffset] + 1]
                     - threadBucket[bptr[i + bptrOffset]]) - 1;
 
             threadBucket[bptr[i + bptrOffset]]++;
@@ -283,19 +295,19 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
         //the last d-suffixes get special handling corresponding to the sorting of the $-signs
         SEQAN_OMP_PRAGMA(single)
         {
-
-            for (int seq = stringCount - 1; seq >= 0; --seq)
+            for (TTextCount k = 1; k <= stringCount; ++k)
             {
+                TTextCount seq = stringCount - k;
                 bptrOffset = seq * bptrExtPerString;
 
-                unsigned seqEndIndex = sequenceLength(seq, s);
-                unsigned seqStartIndex = posGlobalize(
-                        Pair<unsigned, unsigned>(seq, 0), limits);
-                const int tmpValue = code_d(getSequenceByNo(seq, s), d,
+                TTextSize const seqEndIndex = sequenceLength(seq, s);
+                TTextSize const seqStartIndex = posGlobalize(
+                        Pair<TTextCount, TTextSize>(seq, 0), limits);
+                unsigned const tmpValue = code_d(getSequenceByNo(seq, s), d,
                         seqEndIndex - d - 1, alphabeSizeWithDollar);
-                int lastValue = tmpValue;
+                unsigned lastValue = tmpValue;
 
-                for (long i = seqEndIndex - d; i < seqEndIndex; ++i)
+                for (TTextSize i = seqEndIndex - d; i < seqEndIndex; ++i)
                 {
                     lastValue = code_d(getSequenceByNo(seq, s), d, i,
                             alphabeSizeWithDollar, tmpModulo, lastValue);
@@ -305,23 +317,24 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
                 }
 
                 //insert negative values after each sequence
-                long j = seq * 2 * d + seq;
+                TTextSize j = seq * 2 * d + seq;
                 j *= -1;
-                for (long i = seqEndIndex; i <= seqEndIndex + 2 * d; ++i)
+                for (TTextSize i = seqEndIndex; i <= seqEndIndex + 2 * d; ++i)
                 {
                     bptr[seqStartIndex + i + bptrOffset] = --j;
                 }
             }
 
             //reinsert correct bkt values (needed for seward copy)
-            for (int seq = stringCount - 1; seq >= 0; --seq)
+            for (TTextCount k = 1; k <= stringCount; ++k)
             {
+                TTextCount seq = stringCount - k;
                 bptrOffset = seq * bptrExtPerString;
 
-                unsigned seqEndIndex = sequenceLength(seq, s);
-                long lastValue = code_d(getSequenceByNo(seq, s), d,
+                TTextSize const seqEndIndex = sequenceLength(seq, s);
+                unsigned lastValue = code_d(getSequenceByNo(seq, s), d,
                         seqEndIndex - d - 1, alphabeSizeWithDollar);
-                for (long i = seqEndIndex - d; i < seqEndIndex; ++i)
+                for (TTextSize i = seqEndIndex - d; i < seqEndIndex; ++i)
                 {
                     lastValue = code_d(getSequenceByNo(seq, s), d, i,
                             alphabeSizeWithDollar, tmpModulo, lastValue);
@@ -340,7 +353,7 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
 //d: length
 //i: pos in s
 template<typename TText, typename TPos, typename TAlphabetSize>
-unsigned int code_d(TText const & s, unsigned short const & d, TPos const & pos, TAlphabetSize const & alphabetSize)
+unsigned code_d(TText const & s, unsigned short const & d, TPos const & pos, TAlphabetSize const & alphabetSize)
 {
     unsigned int result = 0;
     unsigned local = getSeqOffset(pos);
@@ -362,7 +375,7 @@ unsigned int code_d(TText const & s, unsigned short const & d, TPos const & pos,
 //i: pos in s
 //code_d_i: value of previous suffix
 template<typename TText, typename TPos, typename TAlphabetSize>
-unsigned code_d(TText const & s, unsigned short const & d, TPos const & pos, TAlphabetSize const & alphabetSize, long const & modulo,
+unsigned code_d(TText const & s, unsigned short const & d, TPos const & pos, TAlphabetSize const & alphabetSize, unsigned const & modulo,
         unsigned const & code_d_i)
 {
     unsigned local = getSeqOffset(pos);
@@ -404,8 +417,10 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
         {
             for (TAlpha j = 0; j < ALPHABETSIZE; ++j)
             {
+                //only take buckets, starting with two different characters to avoid inefficient refinement of large 'NNN...N' sequences
                 if (j == i)
                     continue;
+
                 //add 1 since we use 0 as the dollar-sign
                 const TAlpha firstChar = 1 + i;
                 const TAlpha secondChar = 1 + j;
@@ -422,6 +437,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
                     long bucketSize = right - left;
                     if (bucketSize > 0)
                     {
+                        //append this Bucket to list
                         appendValue(bucketIndicesCur, Triple<TBktIndex, TBktIndex, unsigned>(left, right, d));
                     }
                 }
@@ -445,14 +461,16 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
     String<String<Pair<TBktIndex, TBktIndex> > > nextBptrValuesPerThread;
     resize(nextBptrValuesPerThread, omp_get_max_threads());
 
+    //minimal bucketcount of each job
+    const long minBuckets = 100 * omp_get_max_threads();
+
     while (length(bucketIndices) > 0)
     {
-        //Split buckets in reasonable chunks, after each chunk sync refined bptr
+        //Split buckets in reasonable chunks, after each chunk sync refined bptr of each thread
         clear(split);
         appendValue(split, 0);
         long currentLength = 0;
         long lastSplit = 0;
-        const long minBuckets = 100 * omp_get_max_threads();
         for (unsigned k = 0; k < length(bucketIndices); ++k)
         {
             if (k - lastSplit > minBuckets)
@@ -695,7 +713,7 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
         do
         {
             unsigned bptrOffset = getSeqNo(SA[leftInterval]) * bptrExtPerString;
-            // nextBptr[bptrOffset + posGlobalize(SA[leftInterval], limits)] =	rightInterval;
+            // nextBptr[bptrOffset + posGlobalize(SA[leftInterval], limits)] =  rightInterval;
             appendValue(nextBptr, Pair<TSize, TSize>(bptrOffset + posGlobalize(SA[leftInterval], limits), rightInterval));
             --leftInterval;
         }
@@ -709,7 +727,7 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
             && (TSize)getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval) <= right)
     {
         unsigned bptrOffset = getSeqNo(SA[leftInterval]) * bptrExtPerString;
-        //nextBptr[bptrOffset + posGlobalize(SA[leftInterval], limits)] =	rightInterval;
+        //nextBptr[bptrOffset + posGlobalize(SA[leftInterval], limits)] =   rightInterval;
         appendValue(nextBptr, Pair<TSize, TSize>(bptrOffset + posGlobalize(SA[leftInterval], limits), rightInterval));
         --leftInterval;
     }
@@ -724,7 +742,7 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
         do
         {
             unsigned bptrOffset = getSeqNo(SA[leftInterval]) * bptrExtPerString;
-            //nextBptr[bptrOffset + posGlobalize(SA[leftInterval], limits)] =	rightInterval;
+            //nextBptr[bptrOffset + posGlobalize(SA[leftInterval], limits)] =   rightInterval;
             appendValue(nextBptr,
                     Pair<TSize, TSize>(bptrOffset + posGlobalize(SA[leftInterval], limits), rightInterval));
             --leftInterval;
@@ -803,6 +821,11 @@ TBptrVal getBptrVal(TSA const & SA, String<TBptrVal> const & bptr, TLimits const
     //bptrOffset = getSeqNo(SA[index]) * bptrExtPerString
     return bptr[posGlobalize(SA[index], limits) + offset + getSeqNo(SA[index]) * bptrExtPerString];
 }
+
+
+// ============================================================================
+// Functions
+// ============================================================================
 
 }  // namespace seqan
 
