@@ -783,7 +783,7 @@ unsigned int computeLCPAndOffset(TSa const & SA, TBptr const & bptr, TLimits con
     }
 }
 
-//Sort and Refine a Bucket with Size 2 without recursion
+//Sort and refine a bucket with size 2 without recursion
 template<typename TSA, typename TBptr, typename TIndex, typename TLimits>
 void sortSizeTwo(TSA &SA, TBptr const & bptr, TLimits const & limits, unsigned short const & d, unsigned int const & offset,
         TIndex const & left, TIndex const & right)
@@ -797,21 +797,21 @@ void sortSizeTwo(TSA &SA, TBptr const & bptr, TLimits const & limits, unsigned s
     unsigned suffix1 = posGlobalize(SA[left], limits) + offset;
     unsigned suffix2 = posGlobalize(SA[right], limits) + offset;
 
+    //find first non matching entry for both suffixes
     while (bptr[bptrOffset1 + suffix1] == bptr[bptrOffset2 + suffix2])
     {
         suffix1 += d;
         suffix2 += d;
     }
 
+    //if necessary swap both values
     if (bptr[bptrOffset1 + suffix1] > bptr[bptrOffset2 + suffix2])
     {
-        const TSAVal tmp = SA[left];
-        SA[left] = SA[right];
-        SA[right] = tmp;
+        std::swap(SA[left], SA[right]);
     }
 }
 
-// gets the correct value from bptr, respects alls necesary offsets
+// gets the correct value from bptr, respects all necessary offsets
 //
 template<typename TSA, typename TBptrVal, typename TLimits, typename TExtString, typename TOffset,
         typename TIndex>
