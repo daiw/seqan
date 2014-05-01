@@ -249,7 +249,7 @@ void createBwt(TBWT & BWT, TSentinelPosition & sentinelPos, StringSet<TText> & t
     String<String<BucketValueType> > buffer;//Buffer is needed for efficiently inserting multiple new values into the buckets
     resize(buffer, bucketCount, Exact());
 
-    typedef _posComparator<String<Pair<TValueSize, TValueSize> >, unsigned, TValueSize> TPosSortFunctor;
+    typedef _posComparator<String<Pair<TValueSize, TValueSize> >, TValueSize, TValueSize> TPosSortFunctor;
     TPosSortFunctor sortFunctor = TPosSortFunctor(pos); //sortfunctor, which allows to sort pos, by the insert position within the bucket
 
     const unsigned powAlphabetBucketSize = pow(ALPHABETSIZEWITHDOLLAR, bucketSize - 1); //precompute this value, pow is expensive
