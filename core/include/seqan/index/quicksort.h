@@ -75,10 +75,10 @@ The Input gets sortet via quicksort, according to the sortFunctor, if the range 
 ..param.end: endIndex to sort
 */
 template<typename TToSort, typename TSortFunctor, typename TIndex>
-void doQuickSort(QsortSequential const & tag, TToSort & toSort, TSortFunctor & sortFunctor, TIndex const start, TIndex const end)
+void doQuickSort(QsortSequential const tag, TToSort & toSort, TSortFunctor & sortFunctor, TIndex const start, TIndex const end)
 {
     if (end - start > 15)
-        quickSort(tag, toSort, sortFunctor, start, end);
+        quickSort(tag, toSort, sortFunctor, start, end, 0);
     else
         insertionSort(toSort, sortFunctor, start, end);
 }
@@ -96,7 +96,7 @@ The Input gets sortet via quicksort, according to the sortFunctor, if the range 
 ..param.end: endIndex to sort
 */
 template<typename TToSort, typename TSortFunctor, typename TIndex>
-void doQuickSort(QsortParallel const & tag, TToSort & toSort, TSortFunctor & sortFunctor, TIndex const start, TIndex const end)
+void doQuickSort(QsortParallel const tag, TToSort & toSort, TSortFunctor sortFunctor, TIndex const start, TIndex const end)
 {
     if (end - start > 15)
         quickSort(tag, toSort, sortFunctor, start, end, 0);
@@ -118,7 +118,17 @@ The Input gets sortet via quicksort, according to the sortFunctor, if the range 
 ..param.depth: depth of recursion, should be 0 initially
 */
 template<typename TToSort, typename TSortFunctor, typename TIndex>
-void doQuickSort(QsortParallel const & tag, TToSort & toSort, TSortFunctor & sortFunctor, TIndex const start, TIndex const end,
+void doQuickSort(QsortParallel const tag, TToSort & toSort, TSortFunctor sortFunctor, TIndex const start, TIndex const end,
+       long const depth)
+{
+    if (end - start > 15)
+        quickSort(tag, toSort, sortFunctor, start, end, depth);
+    else
+        insertionSort(toSort, sortFunctor, start, end);
+}
+
+template<typename TToSort, typename TSortFunctor, typename TIndex>
+void doQuickSort(QsortSequential const tag, TToSort & toSort, TSortFunctor sortFunctor, TIndex const start, TIndex const end,
        long const depth)
 {
     if (end - start > 15)
@@ -155,7 +165,7 @@ int medianOfThree(Val const a, Val const b, Val const c)
 
 //finds and returns the pivot element within the given range using medianOfThree
 template<typename TResult, typename TToSort, typename TSortFunctor, typename TIndex>
-TResult _findPivot(TToSort & toSort, TSortFunctor & sortFunctor, TIndex const left, TIndex const right)
+TResult _findPivot(TToSort & toSort, TSortFunctor sortFunctor, TIndex const left, TIndex const right)
 {
     typedef typename TSortFunctor::result_type TSortKey;
 
@@ -176,7 +186,7 @@ TResult _findPivot(TToSort & toSort, TSortFunctor & sortFunctor, TIndex const le
 
 //partitions the elements according the pivot element
 template<typename TResult, typename TPivot, typename TToSort, typename TSortFunctor, typename TIndex>
-TResult _partition(TToSort & toSort, TPivot const pivot, TSortFunctor & sortFunctor, TIndex const left, TIndex const right)
+TResult _partition(TToSort & toSort, TPivot const pivot, TSortFunctor sortFunctor, TIndex const left, TIndex const right)
 {
     //lomutos partitioning scheme
     TIndex leftTmp = left;
@@ -199,8 +209,14 @@ TResult _partition(TToSort & toSort, TPivot const pivot, TSortFunctor & sortFunc
 
 //Sort the input with Quicksort. Partition with the pivot element, then do a recursion
 template<typename TToSort, typename TSortFunctor, typename TIndex>
-void quickSort(QsortSequential const & tag, TToSort & toSort, TSortFunctor & sortFunctor, TIndex const left, TIndex const right)
+void quickSort(QsortSequential const tag, TToSort & toSort, TSortFunctor sortFunctor, TIndex const left, TIndex const right, long depth)
 {
+    if(depth > 1000)
+    {
+        insertionSort(toSort, sortFunctor, left, right);
+        return;
+    }
+
     typedef typename TSortFunctor::result_type TSortKey;
 
     TSortKey pivot = _findPivot<TSortKey>(toSort, sortFunctor, left, right);
@@ -209,7 +225,7 @@ void quickSort(QsortSequential const & tag, TToSort & toSort, TSortFunctor & sor
 
     if (right > leftTmp + 1)
     {
-        doQuickSort(tag, toSort, sortFunctor, leftTmp + 1, right);
+        doQuickSort(tag, toSort, sortFunctor, leftTmp + 1, right, depth + 1);
     }
     do
     {
@@ -218,19 +234,19 @@ void quickSort(QsortSequential const & tag, TToSort & toSort, TSortFunctor & sor
     while (leftTmp > left && sortFunctor(leftTmp) == pivot);
     if (leftTmp > left)
     {
-        doQuickSort(tag, toSort, sortFunctor, left, leftTmp);
+        doQuickSort(tag, toSort, sortFunctor, left, leftTmp, depth + 1);
     }
 }
 
 //Sort the input with Quicksort. Partition with the pivot element, then do a recursion
 template<typename TToSort, typename TSortFunctor, typename TIndex>
-void quickSort(QsortParallel const & tag, TToSort & toSort, TSortFunctor & sortFunctor, TIndex const left, TIndex const right,
+void quickSort(QsortParallel const tag, TToSort & toSort, TSortFunctor sortFunctor, TIndex const left, TIndex const right,
         long depth)
 {
     if (depth > 10)
     {
         //Avoid the creation of too many tasks. Their overhead would make it very slow
-        quickSort(QsortSequential(), toSort, sortFunctor, left, right);
+        quickSort(QsortSequential(), toSort, sortFunctor, left, right, depth);
         return;
     }
 
@@ -240,7 +256,7 @@ void quickSort(QsortParallel const & tag, TToSort & toSort, TSortFunctor & sortF
 
     TIndex leftTmp = _partition<TIndex>(toSort, pivot, sortFunctor, left, right);
 
-    SEQAN_OMP_PRAGMA(task firstprivate(leftTmp, right, depth) shared(toSort, tag, sortFunctor))
+    SEQAN_OMP_PRAGMA(task firstprivate(leftTmp, right, depth) shared(toSort, sortFunctor))
     {
         if (right > leftTmp + 1)
         {
@@ -260,7 +276,7 @@ void quickSort(QsortParallel const & tag, TToSort & toSort, TSortFunctor & sortF
 
 //sort the input with insertionSort
 template<typename TToSort, typename TSortFunctor, typename TIndex>
-void insertionSort(TToSort & toSort, TSortFunctor & sortFunctor, TIndex const left, TIndex const right)
+void insertionSort(TToSort & toSort, TSortFunctor sortFunctor, TIndex const left, TIndex const right)
 {
     typedef typename Value<TToSort>::Type TToSortVal;
     typedef typename TSortFunctor::result_type TSortKey;
