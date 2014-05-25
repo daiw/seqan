@@ -219,7 +219,7 @@ void quickSort(QsortSequential const tag, TToSort & toSort, TSortFunctor sortFun
 
     typedef typename TSortFunctor::result_type TSortKey;
 
-    TSortKey pivot = _findPivot<TSortKey>(toSort, sortFunctor, left, right);
+    TSortKey const pivot = _findPivot<TSortKey>(toSort, sortFunctor, left, right);
 
     TIndex leftTmp = _partition<TIndex>(toSort, pivot, sortFunctor, left, right);
 
@@ -256,7 +256,7 @@ void quickSort(QsortParallel const tag, TToSort & toSort, TSortFunctor sortFunct
 
     TIndex leftTmp = _partition<TIndex>(toSort, pivot, sortFunctor, left, right);
 
-    SEQAN_OMP_PRAGMA(task firstprivate(leftTmp, right, depth) shared(toSort, sortFunctor))
+    SEQAN_OMP_PRAGMA(task firstprivate(leftTmp, right, depth, sortFunctor) shared(toSort))
     {
         if (right > leftTmp + 1)
         {
