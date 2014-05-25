@@ -105,7 +105,8 @@ void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
 //
 /////////////////////////
 
-    String<TTextSize> bkt; //set contains the count of the alphabetsize^d buckets
+    //for each bucket, this contains it's startindex in SA
+    String<TTextSize> bkt;
 
     //contains for each entry in text, the index of the last entry of the corresponding Bucket in SA
     //remark: contains negative values to get the correct order of the $-signs
@@ -132,7 +133,7 @@ void createSuffixArray(TSA & SA, TText & s, Bpr const &, unsigned short const d)
     const double begin_time_2 = omp_get_wtime();
 #endif
 
-    sewardCopyPhase2(SA, bptr, s, bkt, limits, d, getAlphabetSize(s)+1);
+    sortAndRefinePhase2(SA, bptr, s, bkt, limits, d, getAlphabetSize(s)+1);
 
     clear(bkt);
     clear(bptr);
@@ -207,40 +208,47 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
         TTextSize const start = splitter[threadNum];
         TTextSize const end = splitter[threadNum + 1];
         TSAValue saValue;
+
+        //If the input has multiple sequences, there has to be an offset between each sequence
+        //for a single input this is always 0
         long bptrOffset;
 
-        //init Bucket per Thread
+        //every thread has it's own bucketTable:
         TBkt &threadBucket = bktPerThread[threadNum];
         resize(threadBucket, bucketCount + 1, 0, Exact());
 
-        //first iteration: compute rank and bucketsizes
+        //////////////////////////////
+        // first iteration: compute rank (code_d) for each d-suffix between start and end and count the bucketsizes
+        //////////////////////////////
+
         posLocalize(saValue, start, limits);
         bptrOffset = getSeqNo(saValue) * bptrExtPerString;
 
+        //compute rank
         unsigned codeD = code_d(
                 getSequenceByNo(getSeqNo(saValue), s), d, saValue,
                 alphabeSizeWithDollar);
-        bptr[start + bptrOffset] = codeD;
-        threadBucket[codeD]++;
+        bptr[start + bptrOffset] = codeD;//store rank
+        threadBucket[codeD]++;//increase bucketSize
 
         for (TTextSize i = start + 1; i < end; ++i)
         {
             posLocalize(saValue, i, limits);
             bptrOffset = getSeqNo(saValue) * bptrExtPerString;
 
+            //compute rank using previous value
             codeD = code_d(
                     getSequenceByNo(getSeqNo(saValue), s), d, saValue,
                     alphabeSizeWithDollar, tmpModulo,
                     codeD);
-            bptr[i + bptrOffset] = codeD;
+            bptr[i + bptrOffset] = codeD;//store rank
 
-            threadBucket[codeD]++;
+            threadBucket[codeD]++;//increase bucketSize
         }
 
         SEQAN_OMP_PRAGMA(barrier)
 
-        //summarize buckets: each thread needs to know how many entries the previous threads are going to insert into the bucket
-        //bkt contains the starting positions (=number of entrys in smaller buckets)
+        //summarize buckets: each thread needs to know how many entries the previous threads are going to insert into each bucket
         SEQAN_OMP_PRAGMA(single)
         {
             bkt[0] = 0;
@@ -268,31 +276,40 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
             }
             bkt[bucketCount] = n;
         }
+        //now bkt contains the starting positions for every bucket (=number of entrys in smaller buckets)
+        //and bktPerThread stores how many entries the previous threads are going to insert into the bucket
 
-        //now fill the buckets
+        //////////////////////
+        // insert the buckets into the suffixarry
+        //////////////////////
         for (TTextSize i = start; i < end; ++i)
         {
             posLocalize(saValue, i, limits);
             bptrOffset = getSeqNo(saValue) * bptrExtPerString;
+            //every thread fills his own range, computed with the bucketSize and the size of previous threads
             TBktValue index = (bkt[bptr[i + bptrOffset] + 1]
                     - threadBucket[bptr[i + bptrOffset]]) - 1;
 
-            threadBucket[bptr[i + bptrOffset]]++;
-            SA[index] = saValue;
+            threadBucket[bptr[i + bptrOffset]]++;//increase number of inserted entrys
+            SA[index] = saValue;//insert the value into the suffixarray
         }
 
         //up to now we misused bptr to save the rank-value of a suffix
-        //now bptr should be a pointer from suffix to bucket
+        //now bptr should be a pointer from suffix to his bucket
         for (TTextSize i = start; i < end; ++i)
         {
             posLocalize(saValue, i, limits);
             bptrOffset = getSeqNo(saValue) * bptrExtPerString;
+            //each bucketpointer points to the buckets last index
+            //this is the next buckets startposition -1:
             bptr[i + bptrOffset] = bkt[bptr[i + bptrOffset] + 1] - 1;
         }
 
         SEQAN_OMP_PRAGMA(barrier)
 
-        //the last d-suffixes get special handling corresponding to the sorting of the $-signs
+        //the last d-suffixes of each sequence gets special handling corresponding to the sorting of the $-signs
+        //this needs to be done to ensure stable sorting: each suffix containing one or more $-signs get a special bucket
+        //this allows to have an order between the different $: $_1<$_2<...<$_x
         SEQAN_OMP_PRAGMA(single)
         {
             for (TTextCount k = 1; k <= stringCount; ++k)
@@ -309,14 +326,17 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
 
                 for (TTextSize i = seqEndIndex - d; i < seqEndIndex; ++i)
                 {
+                    //compute the rank
                     lastValue = code_d(getSequenceByNo(seq, s), d, i,
                             alphabeSizeWithDollar, tmpModulo, lastValue);
 
+                    //this suffix gets an own bucket
                     bptr[bptrOffset + seqStartIndex + i] = bkt[lastValue];
                     bkt[lastValue] = bkt[lastValue] + 1;
                 }
 
                 //insert negative values after each sequence
+                //this ensures unique sortkeys in refinement phase which results in a stable sort order between multiple sequences
                 TTextSize j = seq * 2 * d + seq;
                 j *= -1;
                 for (TTextSize i = seqEndIndex; i <= seqEndIndex + 2 * d; ++i)
@@ -325,7 +345,8 @@ inline void fillBucketsPhase1(TSA & SA, TBptr & bptr, TBkt & bkt, TText const & 
                 }
             }
 
-            //reinsert correct bkt values (needed for seward copy)
+            //some bkt-values got modified, this has to be undone
+            //reinsert correct bkt values (they are later needed for seward copy)
             for (TTextCount k = 1; k <= stringCount; ++k)
             {
                 TTextCount seq = stringCount - k;
@@ -373,24 +394,24 @@ unsigned code_d(TText const & s, unsigned short const & d, TPos const & pos, TAl
 //&s: SuffixArray
 //d: length
 //i: pos in s
-//code_d_i: value of previous suffix
+//previousCodeD: rank of previous suffix
 template<typename TText, typename TPos, typename TAlphabetSize>
 unsigned code_d(TText const & s, unsigned short const & d, TPos const & pos, TAlphabetSize const & alphabetSize, unsigned const & modulo,
-        unsigned const & code_d_i)
+        unsigned const & previousCodeD)
 {
     unsigned local = getSeqOffset(pos);
-    if (local == 0)
+    if (local == 0) //don't use previous rank, if new sequence starts
         return code_d(s, d, pos, alphabetSize);
 
     if (length(s) <= local + d - 1)
-        return alphabetSize * (code_d_i % modulo) + 0;
+        return alphabetSize * (previousCodeD % modulo) + 0;
     else
-        return alphabetSize * (code_d_i % modulo) + 1 + ordValue(s[local + d - 1]);
+        return alphabetSize * (previousCodeD % modulo) + 1 + ordValue(s[local + d - 1]);
 }
 
 //Phase 2: sort and refine all Buckets
 template<typename TSA, typename TText, typename TBptr, typename TBkt, typename TLimit, typename TD, typename TAlpha>
-inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const & bkt, TLimit const & limits, TD const d,
+inline void sortAndRefinePhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const & bkt, TLimit const & limits, TD const d,
         TAlpha const alphabeSizeWithDollar)
 {
     typedef typename Value<TSA>::Type TSAValue;
@@ -408,7 +429,9 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
     StringSet<String<Triple<TBktIndex, TBktIndex, unsigned> > > bucketIndicesSet;
     resize(bucketIndicesSet, omp_get_max_threads());
 
-    //Initial: find non empty Buckets and store their indices
+    ////////////////////////////
+    //Initial: find all non empty Buckets and store their indices
+    ////////////////////////////
     SEQAN_OMP_PRAGMA(parallel)
     {
         String<Triple<TBktIndex, TBktIndex, unsigned> > &bucketIndicesCur = bucketIndicesSet[omp_get_thread_num()];
@@ -449,24 +472,32 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
     const clock_t begin_time = omp_get_wtime();
 #endif
 
-    /*
-     * Now sort these Buckets
-     */
+    //////////////////////////////
+    // Now sort and refine these Buckets
+    //////////////////////////////
 
     StringSet<String<Triple<TBktIndex, TBktIndex, unsigned> > > nextBucketIndices;
     String<Triple<TBktIndex, TBktIndex, unsigned> > bucketIndices = concat(bucketIndicesSet);
-    String<long> split;
-    String<Pair<TBktIndex, TBktIndex> > resultValues;
+    String<unsigned> split;
+    String<Pair<TBktIndex, TBktIndex> > middleValues;
 
     String<String<Pair<TBktIndex, TBktIndex> > > nextBptrValuesPerThread;
     resize(nextBptrValuesPerThread, omp_get_max_threads());
 
     //minimal bucketcount of each job
     const long minBuckets = 100 * omp_get_max_threads();
+    typedef _bprComparator<TTextSize, TSA, TBptr, TLimit, TTextSize> TSortFunctor;
 
+    //sort as long as there are buckets to sort
     while (length(bucketIndices) > 0)
     {
-        //Split buckets in reasonable chunks, after each chunk sync refined bptr of each thread
+        ///////////////////////
+        // Split buckets in reasonable chunks,
+        // each chunk gets sorted and then refined
+        // (if the chunks are to big: refined values can't get used,
+        //  if they are to small: to much parallel sorting can be used)
+        ///////////////////////
+
         clear(split);
         appendValue(split, 0);
         long currentLength = 0;
@@ -482,12 +513,14 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
             currentLength += bucketIndices[k].i2 - bucketIndices[k].i1;
         }
         appendValue(split, length(bucketIndices));
-        resize(resultValues, length(bucketIndices));
+        resize(middleValues, length(bucketIndices));
 
+        ////////////////////////////
         //sort each split and refine afterwards in parallel
         //we can not sort and refine in parallel
-        //if we wait to long with the refinement, the sorting get uneffective.
-        //so we use split to regulary switch between sorting and refinement.
+        //if we wait to long with the refinement, the sorting gets ineffective.
+        //so we use split to regularly switch between sorting and refinement.
+        ////////////////////////////
         for (unsigned i = 1; i < length(split); ++i)
         {
             const long startIndex = split[i - 1];
@@ -510,7 +543,6 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
                     }
                     else
                     {
-                        typedef _bprComparator<TTextSize, TSA, TBptr, TLimit, TTextSize> TSortFunctor;
                         TSortFunctor sortFunctor = TSortFunctor(SA, bptr, limits, bptrExtPerString, offset);
                         doQuickSort(QsortSequential(), SA, sortFunctor, start, end);
                     }
@@ -528,8 +560,9 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
                     const TBktIndex start = bucketIndices[k].i1;
                     const TBktIndex end = bucketIndices[k].i2;
 
-                    //TODO: erkläre resultValues
-                    resultValues[k] = refineBucket(SA, bptr, nextBptrValues, limits, start, end, offset, d);
+                    //refine buckets
+                    //middleValues contains the indices of those buckets, whose sortkeys are also within this bucket
+                    middleValues[k] = refineBucket(SA, bptr, nextBptrValues, limits, start, end, offset, d);
                 }
 
                 // note, the implicit barrier after the for-loop above
@@ -558,7 +591,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
 
             unsigned bptrOffset = getSeqNo(SA[start]) * bptrExtPerString;
 
-            const Pair<TBktIndex, TBktIndex> middleValues = resultValues[k];
+            const Pair<TBktIndex, TBktIndex> middleValue = middleValues[k];
 
             String<Triple<TBktIndex, TBktIndex, unsigned> > &nextBucketIndicesThread = nextBucketIndices[omp_get_thread_num()];
 
@@ -570,9 +603,10 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
                 newOffset = computeLCPAndOffset(SA, bptr, limits, start, end, newOffset, d);
             }
 
-            //TODO: das noch ein bisschen kommentieren
+            //search for subbucket-indices within 'start' and 'end' and add them to the list
+            //ignore range between the middlevalues, it gets treated separately
             TBktIndex leftTmp = start;
-            while (leftTmp < middleValues.i1)
+            while (leftTmp < middleValue.i1)
             {
                 bptrOffset = getSeqNo(SA[leftTmp]) * bptrExtPerString;
                 const TBktIndex rightTmp = bptr[bptrOffset + posGlobalize(SA[leftTmp], limits)];
@@ -585,7 +619,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
                 leftTmp = rightTmp + 1;
             }
 
-            leftTmp = middleValues.i2 + 1;
+            leftTmp = middleValue.i2 + 1;
             while (leftTmp < end)
             {
                 bptrOffset = getSeqNo(SA[leftTmp]) * bptrExtPerString;
@@ -598,14 +632,17 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
                 leftTmp = rightTmp + 1;
             }
 
-            if (middleValues.i2 > middleValues.i1 + 1)
+            //the range between these values is the bucket whose sortkeys were within the original bucket
+            //hence we now that not only the suffixes but also the sortkeys share a common prefix of length 'offset'
+            //so we can double the offset
+            if (middleValue.i2 > middleValue.i1 + 1)
             {
-                appendValue(nextBucketIndicesThread, Triple<TBktIndex, TBktIndex, unsigned>(middleValues.i1 + 1, middleValues.i2, 2*offset));
+                appendValue(nextBucketIndicesThread, Triple<TBktIndex, TBktIndex, unsigned>(middleValue.i1 + 1, middleValue.i2, 2 * offset));
             }
         }
 
         //swap the oldBucketIndices with the new string for the next iteration
-        clear(resultValues);
+        clear(middleValues);
         clear(bucketIndicesSet);
         swap(bucketIndicesSet, nextBucketIndices);
         bucketIndices = concat(bucketIndicesSet);
@@ -620,23 +657,27 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
     /*
      * We now have sorted all Buckets, except those starting with the same first and second character.
      * Theese Buckets can be sorted by using the order of the other buckets.
-     * (This is a kind of seard copy)
+     * (This is based on sewards copy algorithm)
      */
 
-    //Now use seward copy to generate the order for all buckets starting with the same two characters
     SEQAN_OMP_PRAGMA(parallel for)
     for (unsigned i = 0; i < ALPHABETSIZE; ++i)
     {
         const TAlpha firstChar = 1 + i;
 
+        //this finds all buckets starting with the current character twice (interval: [AA;AB[ )
+        //(this are the buckets we want to sort)
         TBktIndex leftVal = bkt[firstChar * bucketsInL1Bucket + firstChar * bucketsInL2Bucket];
         TBktIndex rightVal = bkt[firstChar * bucketsInL1Bucket + (firstChar + 1) * bucketsInL2Bucket];
 
+        //and here we search for all buckets starting with the current character (interval [A;B[ )
+        //(this are all buckets we need to retrive the order of above buckets)
         TBktIndex left = bkt[firstChar * bucketsInL1Bucket];
         TBktIndex right = bkt[(firstChar + 1) * bucketsInL1Bucket];
 
-        //TODO seward kommentieren
 
+        //search for the smallest (sortorder) character whose predecessor is the same as the character.
+        //this has to be the smallest suffix with the character twice, and so on
         while (left < leftVal)
         {
             TSAValue tmp = SA[left]; //firstChar-bucket starts at this position of the text
@@ -647,6 +688,8 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
                 ++left;
                 continue;
             }
+
+            //check if previous character is the same
             const TAlpha character = 1 + ordValue(getSequenceByNo(seqNum, s)[--seqOffset]);
             if (firstChar == character)
             {
@@ -659,6 +702,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
             ++left;
         }
 
+        //now do the same from the right side
         while (left < right)
         {
             --right;
@@ -666,6 +710,7 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
             TTextSize seqOffset = getSeqOffset(tmp);
             const long seqNum = getSeqNo(tmp);
             TAlpha character;
+            //check if previous character is the same
             if (seqOffset > 0 && firstChar == (character = 1 + ordValue(getSequenceByNo(seqNum, s)[--seqOffset])))
             {
                 --rightVal;
@@ -683,7 +728,9 @@ inline void sewardCopyPhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt const
 }
 
 //update bptr after sort
-//this part has its origin in the original algorithm by schürmann and stoye: updatePtrAndRefineBuckets_SaBucket
+//this function is a modified version of updatePtrAndRefineBucketsNum_SaBucket written by
+//schürmann and stoye for the original bpr implementation bpr-0.9.0
+//returning pair describes the range of the subbucket whose sortkeys are also within this bucket
 template<typename TSA, typename TBptr, typename TSize, typename TLimits>
 Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<TSize, TSize> > & nextBptr, TLimits const & limits,
         TSize const & left, TSize const & right, unsigned int const & offset, unsigned short const & d)
@@ -707,6 +754,7 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
     TSize rightInterval = right;
     TSize tmp;
 
+    //at first only refine buckets whose sortkey (bptr+offset) is larger than 'right'
     while (left <= leftInterval
             && right < (tmp = getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval)))// bptr[SA[leftInterval] + offset]))
     {
@@ -722,6 +770,7 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
         rightInterval = leftInterval;
     }
 
+    //since bucketpointer between left and right could change in the other steps in this function (though the offset), they have to be treated separately
     rightInterval = leftInterval;
     while (left <= leftInterval && left <= (TSize)getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval) //bptr[SA[leftInterval] + offset]
             && (TSize)getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval) <= right)
@@ -735,6 +784,7 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
     const TSize middleRight = rightInterval;
     const TSize middleLeft = leftInterval;
 
+    //now refine the remainig range
     rightInterval = leftInterval;
     while (left <= leftInterval)
     {
