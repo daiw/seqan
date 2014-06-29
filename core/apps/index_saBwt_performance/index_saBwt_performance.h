@@ -59,10 +59,12 @@ struct SaBwtAppOptions
 
     bool set;
 
+    bool ascii;
+
     seqan::CharString file;
 
     SaBwtAppOptions() :
-        verbosity(0), computeSA(false), computeBwt(false), compare(false), set(false)
+        verbosity(0), computeSA(false), computeBwt(false), compare(false), set(false), ascii(false)
     {}
 };
 
@@ -87,7 +89,7 @@ void computeBprSuffixArray(TText& text, TSA& sa, Bpr const & tag) {
 #ifdef _OPENMP
 	const clock_t begin_time = omp_get_wtime();
 #endif
-	createSuffixArray(sa, text, tag, 5);
+	createSuffixArray(sa, text, tag, 3);
 #ifdef _OPENMP
 	std::cout << " done in " << float(omp_get_wtime() - begin_time)<<"s. ";
 #endif
@@ -312,15 +314,36 @@ void _internalDoTheWork(const SaBwtAppOptions& options, TInput& seqs) {
 
 void doTheWork(SaBwtAppOptions options) {
 
-	typedef String<Dna5> TInput;
-	typedef typename SAValue<TInput>::Type TSA;
-	typedef String<Dna5> TBwt;
-	TInput seqs;
+    if(options.ascii){
+        typedef String<char> TInput;
+        typedef typename SAValue<TInput>::Type TSA;
+        typedef String<char> TBwt;
+        TInput buffer;
 
-	if (readFasta(seqs, toCString(options.file)) != 0)
-		return;
+        std::fstream in(toCString(options.file), std::ios::in);
+        typedef seqan::RecordReader<std::fstream, seqan::SinglePass<> > TRecordReader;
+        TRecordReader reader(in);
+       // readLetters(buffer, reader);
 
-	_internalDoTheWork<TSA, TBwt>(options, seqs);
+        while (!atEnd(reader))
+        {
+            char c = value(reader);
+            appendValue(buffer, c, Generous());
+            goNext(reader);
+        }
+        _internalDoTheWork<TSA, TBwt>(options, buffer);
+    } else {
+        typedef String<Dna5> TInput;
+        typedef typename SAValue<TInput>::Type TSA;
+        typedef String<Dna5> TBwt;
+        TInput seqs;
+
+        if (readFasta(seqs, toCString(options.file)) != 0){
+            std::cout << "Error while reading fasta file";
+            return;
+        }
+        _internalDoTheWork<TSA, TBwt>(options, seqs);
+    }
 }
 
 
@@ -340,8 +363,10 @@ void doTheWorkSet(SaBwtAppOptions options) {
 	{
 		seqan::StringSet<seqan::CharString> ids;
 		seqan::StringSet<seqan::CharString> quals;
-		if (read2(ids, seqs, quals, reader, seqan::Fastq()) != 0)
+		if (read2(ids, seqs, quals, reader, seqan::Fastq()) != 0){
+		    std::cout << "Error while reading file";
 			return;  // Could not read file.
+		}
 	}
 
 	_internalDoTheWork<TSA, TBwt>(options, seqs);

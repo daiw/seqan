@@ -79,6 +79,7 @@ parseCommandLine(SaBwtAppOptions & options, int argc, char const ** argv)
     addOption(parser, seqan::ArgParseOption("comp", "compare", "Compare computation with refeerence computation"));
     addOption(parser, seqan::ArgParseOption("set", "stringSet", "InputFile contains a StringSet"));
     addOption(parser, seqan::ArgParseOption("f", "file", "Imputfile"));
+    addOption(parser, seqan::ArgParseOption("ascii", "ascii", "input ist ascii not dna"));
 
     // Add Examples Section.
     addTextSection(parser, "Examples");
@@ -106,7 +107,9 @@ parseCommandLine(SaBwtAppOptions & options, int argc, char const ** argv)
 	if (isSet(parser, "compare"))
 		options.compare = true;
 	if (isSet(parser, "set"))
-			options.set = true;
+		options.set = true;
+	if (isSet(parser, "ascii"))
+	    options.ascii = true;
 
 	seqan::getArgumentValue(options.file, parser, 0);
 
