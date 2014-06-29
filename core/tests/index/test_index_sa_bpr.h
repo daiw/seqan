@@ -102,6 +102,19 @@ void compareSuffixArrays(TText const & text, unsigned short const d)
     std::cout.flush();
 #endif
 
+
+//        std::cout<<std::endl;
+//        for (unsigned i = 0; i < length(sa); ++i)
+//        {
+//            std::cout << sa[i];
+//        }
+//        std::cout<<std::endl;
+//        for (unsigned i = 0; i < length(sa); ++i)
+//        {
+//            std::cout << sa2[i];
+//        }
+//        std::cout<<std::endl;
+
     //Check for differences:
     unsigned errors = 0;
     for (unsigned i = 0; i < length(sa) && errors < 100; ++i)
@@ -138,6 +151,9 @@ SEQAN_DEFINE_TEST(test_index_sa_bpr_compareSA){
 
     String<char> text2 = "halloWelt!";
     compareSuffixArrays(text2, 3);
+
+    String<char> text3 = "ababababac";//"abababababababac";
+    compareSuffixArrays(text3, 3);
 
     text = "AC";
     compareSuffixArrays(text, 5);

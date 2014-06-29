@@ -479,7 +479,7 @@ inline void sortAndRefinePhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt co
     StringSet<String<Triple<TBktIndex, TBktIndex, unsigned> > > nextBucketIndices;
     String<Triple<TBktIndex, TBktIndex, unsigned> > bucketIndices = concat(bucketIndicesSet);
     String<unsigned> split;
-    String<Pair<TBktIndex, TBktIndex> > middleValues;
+    String<Pair<long, long> > middleValues;//we need signed values
 
     String<String<Pair<TBktIndex, TBktIndex> > > nextBptrValuesPerThread;
     resize(nextBptrValuesPerThread, omp_get_max_threads());
@@ -591,7 +591,7 @@ inline void sortAndRefinePhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt co
 
             unsigned bptrOffset = getSeqNo(SA[start]) * bptrExtPerString;
 
-            const Pair<TBktIndex, TBktIndex> middleValue = middleValues[k];
+            const Pair<long, long> middleValue = middleValues[k];
 
             String<Triple<TBktIndex, TBktIndex, unsigned> > &nextBucketIndicesThread = nextBucketIndices[omp_get_thread_num()];
 
@@ -606,7 +606,7 @@ inline void sortAndRefinePhase2(TSA & SA, TBptr & bptr, TText const & s, TBkt co
             //search for subbucket-indices within 'start' and 'end' and add them to the list
             //ignore range between the middlevalues, it gets treated separately
             TBktIndex leftTmp = start;
-            while (leftTmp < middleValue.i1)
+            while ((signed)leftTmp < middleValue.i1)
             {
                 bptrOffset = getSeqNo(SA[leftTmp]) * bptrExtPerString;
                 const TBktIndex rightTmp = bptr[bptrOffset + posGlobalize(SA[leftTmp], limits)];
@@ -750,12 +750,12 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
      * from right to left compare sort keys, as long as they are equal they are in the same bucket.
      * set the bucket to the rightmost position
      */
-    TSize leftInterval = right;
-    TSize rightInterval = right;
+    long leftInterval = right;
+    long rightInterval = right;
     TSize tmp;
 
     //at first only refine buckets whose sortkey (bptr+offset) is larger than 'right'
-    while (left <= leftInterval
+    while ((signed)left <= leftInterval
             && right < (tmp = getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval)))// bptr[SA[leftInterval] + offset]))
     {
         do
@@ -765,14 +765,14 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
             appendValue(nextBptr, Pair<TSize, TSize>(bptrOffset + posGlobalize(SA[leftInterval], limits), rightInterval));
             --leftInterval;
         }
-        while (left <= leftInterval && (TSize)getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval)/*bptr[SA[leftInterval] + offset]*/
+        while ((signed)left <= leftInterval && (TSize)getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval)/*bptr[SA[leftInterval] + offset]*/
                 == tmp);
         rightInterval = leftInterval;
     }
 
     //since bucketpointer between left and right could change in the other steps in this function (though the offset), they have to be treated separately
     rightInterval = leftInterval;
-    while (left <= leftInterval && left <= (TSize)getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval) //bptr[SA[leftInterval] + offset]
+    while ((signed)left <= leftInterval && left <= (TSize)getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval) //bptr[SA[leftInterval] + offset]
             && (TSize)getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval) <= right)
     {
         unsigned bptrOffset = getSeqNo(SA[leftInterval]) * bptrExtPerString;
@@ -786,7 +786,7 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
 
     //now refine the remainig range
     rightInterval = leftInterval;
-    while (left <= leftInterval)
+    while ((signed)left <= leftInterval)
     {
         const TSize tmp2 = getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval); //bptr[SA[leftInterval] + offset];
         do
@@ -797,12 +797,12 @@ Pair<TSize, TSize> refineBucket(TSA const & SA, TBptr const & bptr, String<Pair<
                     Pair<TSize, TSize>(bptrOffset + posGlobalize(SA[leftInterval], limits), rightInterval));
             --leftInterval;
         }
-        while (left <= leftInterval && (TSize)getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval)/*bptr[SA[leftInterval] + offset] */
+        while ((signed)left <= leftInterval && (TSize)getBptrVal(SA, bptr, limits, bptrExtPerString, offset, leftInterval)/*bptr[SA[leftInterval] + offset] */
             == tmp2);
         rightInterval = leftInterval;
     }
 
-    return Pair<TSize, TSize>(middleLeft, middleRight);
+    return Pair<long, long>(middleLeft, middleRight);
 }
 
 //finds the longest common prefix and increases the current offset
