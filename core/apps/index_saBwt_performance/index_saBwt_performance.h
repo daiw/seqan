@@ -89,9 +89,23 @@ void computeBprSuffixArray(TText& text, TSA& sa, Bpr const & tag) {
 #ifdef _OPENMP
 	const clock_t begin_time = omp_get_wtime();
 #endif
-	createSuffixArray(sa, text, tag, 3);
+	createSuffixArray(sa, text, tag, 5);
 #ifdef _OPENMP
 	std::cout << " done in " << float(omp_get_wtime() - begin_time)<<"s. ";
+#endif
+}
+
+template<typename TSA>
+void computeBprSuffixArray(CharString& text, TSA& sa, Bpr const & tag) {
+
+    resize(sa, lengthSum(text));
+
+#ifdef _OPENMP
+    const clock_t begin_time = omp_get_wtime();
+#endif
+    createSuffixArray(sa, text, tag, 3);
+#ifdef _OPENMP
+    std::cout << " done in " << float(omp_get_wtime() - begin_time)<<"s. ";
 #endif
 }
 
