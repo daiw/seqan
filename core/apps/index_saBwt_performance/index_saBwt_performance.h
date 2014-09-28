@@ -61,10 +61,12 @@ struct SaBwtAppOptions
 
     bool ascii;
 
+    int cores;
+
     seqan::CharString file;
 
     SaBwtAppOptions() :
-        verbosity(0), computeSA(false), computeBwt(false), compare(false), set(false), ascii(false)
+        verbosity(0), computeSA(false), computeBwt(false), compare(false), set(false), ascii(false), cores(-1)
     {}
 };
 
@@ -284,7 +286,6 @@ void compareBwt(TBWT &bwt, TSENT &sentinelPos, TBWT &bwt2,
 template<typename TSA, typename TBwt, typename TInput>
 void _internalDoTheWork(const SaBwtAppOptions& options, TInput& seqs) {
 
-	int max = omp_get_max_threads();
 	String<TSA> saRef;
 	if (options.computeSA && options.compare) {
 		std::cout << "\tComputing SA Skew7...";
@@ -298,13 +299,18 @@ void _internalDoTheWork(const SaBwtAppOptions& options, TInput& seqs) {
 		computeBwtViaSA(seqs, bwtRef, sentinelPosRef);
 		std::cout << std::endl;
 	}
-	for (int k = max; k > 0; k--) {
+
+
+    int max = options.cores==-1 ? omp_get_max_threads() : options.cores;
+    int min = options.cores==-1 ? 0 : options.cores-1;
+
+	for (int k = max; k > min; k--) {
 		omp_set_num_threads(k);
 //		std::cout << "Processor count: " << omp_get_num_procs()
 //				<< " Thread count: " << omp_get_max_threads() << ". ";
 //		std::cout << std::endl;
 
-		std::cout << options.file <<"\t";
+		std::cout << options.file <<"\t"<<k<<"\t";
 		if (options.computeSA) {
 			String<TSA> sa;
 			std::cout << "Bpr\t";

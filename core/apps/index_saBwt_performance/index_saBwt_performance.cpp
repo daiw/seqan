@@ -66,7 +66,7 @@ parseCommandLine(SaBwtAppOptions & options, int argc, char const ** argv)
 
     // Define usage line and long description.
     addUsageLine(parser, "[\\fIOPTIONS\\fP] \"\\fITEXT\\fP\"");
-    addDescription(parser, "This is the application skelleton and you should modify this string.");
+    addDescription(parser, "This is the application skeleton and you should modify this string.");
 
     // We require one argument.
     addArgument(parser, seqan::ArgParseArgument(seqan::ArgParseArgument::STRING, "TEXT"));
@@ -76,10 +76,11 @@ parseCommandLine(SaBwtAppOptions & options, int argc, char const ** argv)
     addOption(parser, seqan::ArgParseOption("vv", "very-verbose", "Enable very verbose output."));
     addOption(parser, seqan::ArgParseOption("sa", "computeSA", "Compute Suffix Array"));
     addOption(parser, seqan::ArgParseOption("bwt", "computeBWT", "Compute Burrows-Wheeler-Transformation"));
-    addOption(parser, seqan::ArgParseOption("comp", "compare", "Compare computation with refeerence computation"));
+    addOption(parser, seqan::ArgParseOption("comp", "compare", "Compare computation with reference computation"));
     addOption(parser, seqan::ArgParseOption("set", "stringSet", "InputFile contains a StringSet"));
-    addOption(parser, seqan::ArgParseOption("f", "file", "Imputfile"));
-    addOption(parser, seqan::ArgParseOption("ascii", "ascii", "input ist ascii not dna"));
+    addOption(parser, seqan::ArgParseOption("f", "file", "Inputfile"));
+    addOption(parser, seqan::ArgParseOption("ascii", "ascii", "input is ascii not dna"));
+    addOption(parser, seqan::ArgParseOption("cores", "cores", "number of used cores", seqan::ArgParseArgument::INTEGER, "INT"));
 
     // Add Examples Section.
     addTextSection(parser, "Examples");
@@ -110,6 +111,9 @@ parseCommandLine(SaBwtAppOptions & options, int argc, char const ** argv)
 		options.set = true;
 	if (isSet(parser, "ascii"))
 	    options.ascii = true;
+	if (isSet(parser, "cores"))
+	    getOptionValue(options.cores, parser, "cores");
+//	    options.cores = getArgumentValue(getOption(parser, "cores"));
 
 	seqan::getArgumentValue(options.file, parser, 0);
 
