@@ -135,7 +135,7 @@ int main(int argc, char const ** argv)
     if (res != seqan::ArgumentParser::PARSE_OK)
         return res == seqan::ArgumentParser::PARSE_ERROR;
 
-    std::cout << "Params: "<<(options.computeSA?"Compute SA, ":"")<< (options.computeBwt?"Compute BWT, ":"")<<(options.compare?"Compare with reference, ":"")<<"File: "<<options.file<<std::endl;
+    //std::cout << "Params: "<<(options.computeSA?"Compute SA, ":"")<< (options.computeBwt?"Compute BWT, ":"")<<(options.compare?"Compare with reference, ":"")<<"File: "<<options.file<<std::endl;
 
     if(options.set){
     	doTheWorkSet(options);
@@ -154,3 +154,4 @@ int main(int argc, char const ** argv)
     std::cout<<std::endl;
     return 0;
 }
+

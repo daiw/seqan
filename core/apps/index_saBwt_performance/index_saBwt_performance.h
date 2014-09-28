@@ -77,7 +77,7 @@ void computeBprSuffixArray(TText& text, TSA& sa, const TTag tag) {
 #endif
 	createSuffixArray(sa, text, tag);
 #ifdef _OPENMP
-	std::cout << " done in " << float(omp_get_wtime() - begin_time)<<"s. ";
+	std::cout << "" << float(omp_get_wtime() - begin_time)<<"\t";
 #endif
 }
 
@@ -91,7 +91,7 @@ void computeBprSuffixArray(TText& text, TSA& sa, Bpr const & tag) {
 #endif
 	createSuffixArray(sa, text, tag, 5);
 #ifdef _OPENMP
-	std::cout << " done in " << float(omp_get_wtime() - begin_time)<<"s. ";
+	std::cout << "" << float(omp_get_wtime() - begin_time)<<"\t";
 #endif
 }
 
@@ -105,7 +105,7 @@ void computeBprSuffixArray(CharString& text, TSA& sa, Bpr const & tag) {
 #endif
     createSuffixArray(sa, text, tag, 3);
 #ifdef _OPENMP
-    std::cout << " done in " << float(omp_get_wtime() - begin_time)<<"s. ";
+    std::cout << "" << float(omp_get_wtime() - begin_time)<<"\t";
 #endif
 }
 
@@ -121,8 +121,8 @@ void compareSuffixArray(TSA& sa1, TSA& sa2) {
 		}
 		std::cerr.flush();
 	}
-	if (errors == 0)
-		std::cout << "NO ERRORS!";
+//	if (errors == 0)
+//		std::cout << "NO ERRORS!";
 
 }
 
@@ -144,7 +144,7 @@ void computeBwt(StringSet<TText> &texts, TBWT &bwt, TSENT &sentinelPos) {
 #ifdef _OPENMP
 	time = float(omp_get_wtime() - begin_time);
 #endif
-	std::cout << " done in " << time <<"s. ";
+	std::cout << "" << time <<"\t";
 }
 
 template<typename TText, typename TBWT, typename TSENT>
@@ -165,7 +165,7 @@ void computeBwt(TText &texts, TBWT &bwt, TSENT &sentinelPos) {
 #ifdef _OPENMP
 	time = float(omp_get_wtime() - begin_time);
 #endif
-	std::cout << " done in " << time <<"s. ";
+	std::cout << "" << time <<"\t";
 }
 
 template<typename TText, typename TBWT, typename TSENT>
@@ -192,7 +192,7 @@ void computeBwtViaSA(StringSet<TText> &texts, TBWT &bwt, TSENT &sentinelPos) {
 #ifdef _OPENMP
 	time = float(omp_get_wtime() - begin_time);
 #endif
-	std::cout << " done in " << time <<"s. ";
+	std::cout << "" << time <<"\t";
 
 	resize(sentinelPos, countSequences(texts));
 
@@ -229,7 +229,7 @@ void computeBwtViaSA(TText texts, TBWT &bwt, TSENT &sentinelPos) {
 #ifdef _OPENMP
 	time = float(omp_get_wtime() - begin_time);
 #endif
-	std::cout << " done in " << time <<"s. "<< std::endl;
+	std::cout << "" << time <<"\t";
 
 	resize(sentinelPos, countSequences(texts));
 	for (unsigned i = 0; i < length(bwt); ++i) {
@@ -276,8 +276,8 @@ void compareBwt(TBWT &bwt, TSENT &sentinelPos, TBWT &bwt2,
 		if(error>50)
 			break;
 	}
-	if (error == 0)
-		std::cout << "NO ERRORS! ";
+//	if (error == 0)
+//		std::cout << "NO ERRORS! ";
 
 }
 
@@ -300,29 +300,29 @@ void _internalDoTheWork(const SaBwtAppOptions& options, TInput& seqs) {
 	}
 	for (int k = max; k > 0; k--) {
 		omp_set_num_threads(k);
-		std::cout << "Processor count: " << omp_get_num_procs()
-				<< " Thread count: " << omp_get_max_threads() << ". ";
-		std::cout << std::endl;
+//		std::cout << "Processor count: " << omp_get_num_procs()
+//				<< " Thread count: " << omp_get_max_threads() << ". ";
+//		std::cout << std::endl;
 
+		std::cout << options.file <<"\t";
 		if (options.computeSA) {
 			String<TSA> sa;
-			std::cout << "\tComputing Bpr...";
+			std::cout << "Bpr\t";
 			computeBprSuffixArray(seqs, sa, Bpr());
 			if (options.compare) {
 				compareSuffixArray(saRef, sa);
 			}
-			std::cout << std::endl;
 		}
 		if (options.computeBwt) {
 			TBwt bwt;
 			String<unsigned> sentinelPos;
-			std::cout << "\tComputing Bwt...";
+			std::cout << "BWT\t";
 			computeBwt(seqs, bwt, sentinelPos);
 			if (options.compare) {
 				compareBwt(bwtRef, sentinelPosRef, bwt, sentinelPos);
 			}
-			std::cout << std::endl;
 		}
+        std::cout << std::endl;
 	}
 }
 
@@ -385,4 +385,5 @@ void doTheWorkSet(SaBwtAppOptions options) {
 
 	_internalDoTheWork<TSA, TBwt>(options, seqs);
 }
+
 
