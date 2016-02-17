@@ -144,6 +144,16 @@ add_executable (test_index_repeats
                test_index_repeats.h)
 target_link_libraries (test_index_repeats ${SEQAN_LIBRARIES})
 
+add_executable (test_index_sa_bpr
+               test_index_sa_bpr.cpp
+               test_index_sa_bpr.h)
+target_link_libraries (test_index_sa_bpr ${SEQAN_LIBRARIES})
+
+add_executable (test_index_bwt_bcr
+               test_index_bwt_bcr.cpp
+               test_index_bwt_bcr.h)
+target_link_libraries (test_index_bwt_bcr ${SEQAN_LIBRARIES})
+
 add_executable (test_index_swift
                 test_index_swift.cpp)
 target_link_libraries (test_index_swift ${SEQAN_LIBRARIES})
@@ -178,4 +188,6 @@ add_test (NAME test_test_index_view COMMAND $<TARGET_FILE:test_index_view>)
 add_test (NAME test_test_index_finder COMMAND $<TARGET_FILE:test_index_finder>)
 add_test (NAME test_test_find_backtracking COMMAND $<TARGET_FILE:test_find_backtracking>)
 add_test (NAME test_test_index_repeats COMMAND $<TARGET_FILE:test_index_repeats>)
+add_test (NAME test_test_index_sa_bpr COMMAND $<TARGET_FILE:test_index_sa_bpr>)
+add_test (NAME test_test_index_bwt_bcr COMMAND $<TARGET_FILE:test_index_bwt_bcr>)
 
